@@ -173,6 +173,18 @@
     return kst.getUTCFullYear() + '-' + pad2(kst.getUTCMonth() + 1) + '-' + pad2(kst.getUTCDate());
   }
 
+  /* saju.js(십성 엔진) 참조 — 브라우저는 전역, Node는 require. 한 번만 해석해 캐시한다. */
+  var _saju = undefined;
+  function getSaju() {
+    if (_saju !== undefined) return _saju;
+    _saju = null;
+    try {
+      if (typeof window !== 'undefined' && window.SajuEngine) _saju = window.SajuEngine;
+      else if (typeof require === 'function') _saju = require('./saju.js');
+    } catch (e) { _saju = null; }
+    return _saju;
+  }
+
   /* =========================================================
    * 2. 진단 엔진 (01_운세진단_스펙.md — B)
    * ======================================================= */
@@ -327,6 +339,20 @@
     '건강': { 부적: '면접 부적', 카피: '오늘 기운이 빠지기 쉬운 날 — 면접 부적으로 기세를 세우세요.' }
   };
 
+  /* D1(하한 30) — 30점대 전용 요약 문구.
+   * 원칙: 불안 조장 금지. "나쁜 날"이라 말하지 않고 '무엇을 하면 되는지'만 남긴다.
+   * 25조합 요약(SUMMARY)보다 우선해 표시된다(가장 낮은 구간에서만). */
+  var LOW_TONE = [
+    '속도를 늦추면 오히려 정리가 되는 날 — 급한 결정은 내일로 미뤄 두세요.',
+    '벌이기보다 지키기 좋은 날 — 이미 하던 일부터 하나씩 마무리해 보세요.',
+    '무리하지 않는 것이 최선인 날 — 중요한 일만 남기고 나머지는 덜어 내세요.'
+  ];
+  /** 점수 구간에 맞는 요약 문구(결정론). 30점대만 LOW_TONE으로 대체한다. */
+  function summaryFor(dg, todayNo, myNo) {
+    if (dg.score < 40) return LOW_TONE[mod(todayNo + myNo, LOW_TONE.length)];
+    return dg.summary;
+  }
+
   var AREA_ICON = { '좋음': '●', '보통': '◐', '주의': '○' };
 
   /**
@@ -339,7 +365,18 @@
     var r1 = relation(x, todayP.오행);     // 천간 관계(주축)
     var r2 = relation(x, todayP.지지오행); // 지지 관계(보조)
 
-    var score = scoreOf(r1, r2, mine.갑자순번, todayP.갑자순번);
+    /* D. 점수는 십성 10종 기반으로 산출한다(saju.js SCORE_TABLE).
+     * 구 5유형 scoreOf()는 겁재를 '보통'으로 처리해 전통 통념(사흉신)과 어긋났다
+     * — 리포트 4-3 지적 반영. saju.js가 없으면 구 산식으로 폴백한다. */
+    var SJx = getSaju();
+    var score, tenGodInfo = null;
+    if (SJx && mine.일간 && todayP.일간 && todayP.일지) {
+      tenGodInfo = SJx.todayScore(mine.일간, todayP.일간, todayP.일지,
+        mine.갑자순번, todayP.갑자순번);
+      score = tenGodInfo.score;
+    } else {
+      score = scoreOf(r1, r2, mine.갑자순번, todayP.갑자순번);
+    }
     var areas = areasOf(r1, r2, todayP.갑자순번, mine.갑자순번);
 
     // 주의 영역 → 처방 연결. 여럿이면 AREA_ORDER 앞쪽 1개(결정론).
@@ -356,6 +393,7 @@
       r1: r1, r2: r2,
       r1_label: TYPE_LABEL[r1], r2_label: TYPE_LABEL[r2],
       score: score,
+      tenGod: tenGodInfo,
       areas: areas,
       caution: caution,
       summary: SUMMARY[r1][r2],
@@ -474,6 +512,10 @@
     check('②전수 전제: 60일주 순번 전수', Object.keys(noSet).length, 60);
     check('②전수 전제: 순번↔일주 일치', pillars[15].일주_한글, iljuByNo(pillars[15].갑자순번));
 
+    // 점수 기대범위는 saju.js의 SCORE_FLOOR/CEIL을 따른다(D1 변경 시 자동 추종).
+    var _sj = getSaju();
+    var SCORE_LO = _sj ? _sj.SCORE_FLOOR : 40;
+    var SCORE_HI = _sj ? _sj.SCORE_CEIL : 95;
     var total = 0, badScore = 0, badAreaCount = 0, badCaution = 0, badLevel = 0,
       badSummary = 0, badWhy = 0, badPrescription = 0;
     var hist = {};
@@ -490,7 +532,7 @@
         var dg = diagnose(pillars[mi], pillars[ti]);
         total++;
 
-        if (!(typeof dg.score === 'number' && dg.score >= 40 && dg.score <= 95)) badScore++;
+        if (!(typeof dg.score === 'number' && dg.score >= SCORE_LO && dg.score <= SCORE_HI)) badScore++;
 
         var keys = Object.keys(dg.areas);
         if (keys.length !== 4) badAreaCount++;
@@ -513,7 +555,7 @@
     }
 
     check('②전수 조합 수', total, 3600);
-    check('②점수 40~95 이탈', badScore, 0);
+    check('②점수 ' + SCORE_LO + '~' + SCORE_HI + ' 이탈', badScore, 0);
     check('②영역 4개 배정 이탈', badAreaCount, 0);
     check('②영역 단계값 이탈', badLevel, 0);
     check('②주의 최소 1개 미달', badCaution, 0);
@@ -921,7 +963,8 @@
 
   var doc = win.document;
   var $ = function (id) { return doc.getElementById(id); };
-  var state = { ilju: null, guardian: null, talisman: null, diag: null, ctaShown: false };
+  var state = { ilju: null, guardian: null, talisman: null, diag: null, ctaShown: false,
+    profile: null, pillars: null, strength: null };
   var reached = {};
 
   function show(screenId) {
@@ -990,7 +1033,7 @@
 
     $('flowDate').textContent = today.replace(/-/g, '. ');
     $('flowGanji').textContent = t.일주_한글 + '(' + t.일주_한자 + ') · ' + t.오행 + OHAENG_ATTR[t.오행].한자;
-    $('flowSummary').textContent = dg.summary;
+    $('flowSummary').textContent = summaryFor(dg, t.갑자순번, state.guardian.갑자순번);
     $('whyLine').textContent = dg.why;
 
     // 4영역
@@ -1038,13 +1081,14 @@
     panel.classList.remove('unrolled');
     seal.classList.remove('stamped');
     scoreEl.textContent = String(dg.score);
+    seal.textContent = dg.score >= 65 ? '吉' : (dg.score >= 40 ? '平' : '凶');
 
     if (reduceMotion) {
       panel.classList.add('unrolled');
       seal.classList.add('stamped');
     } else {
       // 카운트업(값은 결정론 — 연출만 점진적)
-      var target = dg.score, cur = Math.max(40, target - 18), step = 0;
+      var target = dg.score, cur = Math.max(30, target - 18), step = 0;
       scoreEl.textContent = String(cur);
       win.requestAnimationFrame(function () { panel.classList.add('unrolled'); });
       var timer = win.setInterval(function () {
@@ -1133,6 +1177,451 @@
     }
   }
 
+
+  /* =========================================================
+   * 9. v3 프로필 층 + 휠 피커 + 사주 분석 (B·C·D)
+   *
+   * 4기둥은 vendor/manseryeok.js(MIT)에 위임한다. 야자시는 참고앱 정합을 위해
+   * dayBoundary:'jasi'(23:30 경계)로 고정하고, UI에서 "모름"을 허용한다.
+   * ======================================================= */
+
+  var MS = win.Manseryeok || null;          // 4기둥 라이브러리(없으면 사주 화면만 비활성)
+  var SJ = win.SajuEngine || null;          // 십성·오행·성격 엔진
+  var PF = win.ProfileStore || null;        // 프로필 저장소 모듈
+  var profiles = PF ? PF.makeStore(store) : null;
+
+  var DAY_BOUNDARY = 'jasi';                // 야자시 고정(대표님 승인 2026-08-22)
+
+  /* ---- 프로필 -> 4기둥 ---- */
+  function pillarsOf(p) {
+    if (!MS) return null;
+    var hourInfo = PF.resolveHour(p);
+    var info = {
+      year: p.year, month: p.month, day: p.day,
+      hour: hourInfo ? hourInfo.h : 12,      // 모름이면 정오로 계산하되 시주는 표시하지 않는다
+      minute: hourInfo ? hourInfo.m : 0,
+      isLunar: p.calendar === 'lunar',
+      isLeapMonth: !!p.leap,
+      dayBoundary: DAY_BOUNDARY
+    };
+    try {
+      var r = MS.calculateFourPillars(info);
+      return {
+        year: { stem: r.year.heavenlyStem, branch: r.year.earthlyBranch },
+        month: { stem: r.month.heavenlyStem, branch: r.month.earthlyBranch },
+        day: { stem: r.day.heavenlyStem, branch: r.day.earthlyBranch },
+        hour: hourInfo ? { stem: r.hour.heavenlyStem, branch: r.hour.earthlyBranch } : null,
+        solar: MS.lunarToSolar && p.calendar === 'lunar'
+          ? MS.lunarToSolar(p.year, p.month, p.day, !!p.leap)
+          : { year: p.year, month: p.month, day: p.day }
+      };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /** 프로필의 양력 생년월일 ISO — 수호신 카드(기존 일주 산술)용 */
+  function solarISOof(p) {
+    var pil = pillarsOf(p);
+    var s = (pil && pil.solar) ? pil.solar : { year: p.year, month: p.month, day: p.day };
+    return s.year + '-' + pad2(s.month) + '-' + pad2(s.day);
+  }
+
+  /* =========================================================
+   * 9-1. 프로필 목록 (S0)
+   * ======================================================= */
+
+  function renderProfileList() {
+    if (!profiles) return;
+    var box = $('profileList');
+    box.innerHTML = '';
+    var list = profiles.list();
+
+    if (!list.length) {
+      var empty = doc.createElement('p');
+      empty.className = 'tiny center';
+      empty.textContent = '아직 등록된 사용자가 없습니다. 아래에서 추가해 주세요.';
+      box.appendChild(empty);
+    }
+
+    for (var i = 0; i < list.length; i++) {
+      (function (p) {
+        var row = doc.createElement('div');
+        row.className = 'profile-row';
+
+        var pick = doc.createElement('button');
+        pick.type = 'button';
+        pick.className = 'profile-pick';
+
+        var nm = doc.createElement('span');
+        nm.className = 'profile-name';
+        nm.textContent = p.name;
+
+        var meta = doc.createElement('span');
+        meta.className = 'profile-meta';
+        var cal = p.calendar === 'lunar' ? (p.leap ? '음력 윤달' : '음력') : '양력';
+        var hrInfo = PF.resolveHour(p);
+        var hr = hrInfo ? (hrInfo.label + ' ' + hrInfo.range) : '시각 모름';
+        meta.textContent = cal + ' ' + p.year + '.' + pad2(p.month) + '.' + pad2(p.day) + ' · ' + hr;
+
+        pick.appendChild(nm);
+        pick.appendChild(meta);
+        pick.addEventListener('click', function () {
+          selectProfile(p.id);
+        });
+
+        var del = doc.createElement('button');
+        del.type = 'button';
+        del.className = 'profile-del';
+        del.setAttribute('aria-label', p.name + ' 삭제');
+        del.textContent = '삭제';
+        del.addEventListener('click', function () {
+          if (win.confirm(p.name + ' 님의 프로필을 지울까요?')) {
+            profiles.remove(p.id);
+            track('profile_removed', {});
+            renderProfileList();
+          }
+        });
+
+        row.appendChild(pick);
+        row.appendChild(del);
+        box.appendChild(row);
+      })(list[i]);
+    }
+  }
+
+  function selectProfile(id) {
+    var p = profiles.get(id);
+    if (!p) return;
+    profiles.setActive(id);
+    state.profile = p;
+    var iso = solarISOof(p);
+    // C-⑤ 생년월일 원문은 계측에 넣지 않는다 — 일주 결과값만
+    var g = read(iso);
+    store.set(LS.ilju, g.일주_한글);
+    track('profile_selected', {
+      ilju: g.일주_한글, ohaeng: g.오행,
+      calendar: p.calendar, has_hour: !!p.hourBranch, has_gender: !!p.gender
+    });
+    renderS2(iso);
+  }
+
+  /* =========================================================
+   * 9-2. 휠 피커 (생년월일 3열)
+   * ======================================================= */
+
+  var pickState = { y: 1990, m: 1, d: 1 };
+  var ITEM_H = 40;   // .wheel-item 높이(css와 동기)
+
+  function buildWheel(el, values, current, onPick) {
+    el.innerHTML = '';
+    var padTop = doc.createElement('div');
+    padTop.className = 'wheel-pad';
+    el.appendChild(padTop);
+
+    for (var i = 0; i < values.length; i++) {
+      (function (v) {
+        var it = doc.createElement('div');
+        it.className = 'wheel-item';
+        it.setAttribute('role', 'option');
+        it.dataset.value = String(v.value);
+        it.textContent = v.label;
+        if (v.value === current) it.classList.add('is-sel');
+        it.addEventListener('click', function () {
+          scrollToValue(el, v.value);
+          onPick(v.value);
+        });
+        el.appendChild(it);
+      })(values[i]);
+    }
+
+    var padBot = doc.createElement('div');
+    padBot.className = 'wheel-pad';
+    el.appendChild(padBot);
+
+    scrollToValue(el, current, true);
+  }
+
+  function scrollToValue(el, value, instant) {
+    var items = el.querySelectorAll('.wheel-item');
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].dataset.value === String(value)) {
+        var top = i * ITEM_H;
+        if (instant || reduceMotion) el.scrollTop = top;
+        else if (el.scrollTo) el.scrollTo({ top: top, behavior: 'smooth' });
+        else el.scrollTop = top;
+        markSelected(el, value);
+        return;
+      }
+    }
+  }
+
+  function markSelected(el, value) {
+    var items = el.querySelectorAll('.wheel-item');
+    for (var i = 0; i < items.length; i++) {
+      var on = items[i].dataset.value === String(value);
+      items[i].classList[on ? 'add' : 'remove']('is-sel');
+      items[i].setAttribute('aria-selected', on ? 'true' : 'false');
+    }
+  }
+
+  /** 스크롤이 멈추면 가운데 항목으로 스냅 */
+  function attachSnap(el, getValues, onPick) {
+    var t = null;
+    el.addEventListener('scroll', function () {
+      if (t) win.clearTimeout(t);
+      t = win.setTimeout(function () {
+        var idx = Math.round(el.scrollTop / ITEM_H);
+        var vals = getValues();
+        if (idx < 0) idx = 0;
+        if (idx > vals.length - 1) idx = vals.length - 1;
+        var v = vals[idx];
+        if (v === undefined) return;
+        el.scrollTop = idx * ITEM_H;   // 스냅
+        markSelected(el, v.value);
+        onPick(v.value);
+      }, 90);
+    }, { passive: true });
+
+    // 접근성: 키보드 위/아래
+    el.addEventListener('keydown', function (e) {
+      var vals = getValues();
+      var cur = 0;
+      for (var i = 0; i < vals.length; i++) {
+        if (el.querySelector('.wheel-item.is-sel') &&
+          el.querySelector('.wheel-item.is-sel').dataset.value === String(vals[i].value)) { cur = i; break; }
+      }
+      var next = null;
+      if (e.key === 'ArrowDown') next = Math.min(vals.length - 1, cur + 1);
+      else if (e.key === 'ArrowUp') next = Math.max(0, cur - 1);
+      else if (e.key === 'Home') next = 0;
+      else if (e.key === 'End') next = vals.length - 1;
+      if (next === null) return;
+      e.preventDefault();
+      scrollToValue(el, vals[next].value);
+      onPick(vals[next].value);
+    });
+  }
+
+  function yearValues() {
+    var out = [], nowY = parseInt(today.slice(0, 4), 10);
+    for (var y = 1900; y <= nowY; y++) out.push({ value: y, label: y + '년' });
+    return out;
+  }
+  function monthValues() {
+    var out = [];
+    for (var m = 1; m <= 12; m++) out.push({ value: m, label: m + '월' });
+    return out;
+  }
+  function dayValues() {
+    var out = [], dim = PF.daysInMonth(pickState.y, pickState.m);
+    for (var d = 1; d <= dim; d++) out.push({ value: d, label: d + '일' });
+    return out;
+  }
+
+  function refreshDayWheel() {
+    var dim = PF.daysInMonth(pickState.y, pickState.m);
+    if (pickState.d > dim) pickState.d = dim;      // 2월 31일 같은 조합 차단
+    buildWheel($('wheelD'), dayValues(), pickState.d, function (v) { pickState.d = v; });
+  }
+
+  function openBirthPicker() {
+    var sheet = $('birthPicker');
+    buildWheel($('wheelY'), yearValues(), pickState.y, function (v) {
+      pickState.y = v; refreshDayWheel();
+    });
+    buildWheel($('wheelM'), monthValues(), pickState.m, function (v) {
+      pickState.m = v; refreshDayWheel();
+    });
+    refreshDayWheel();
+    sheet.hidden = false;
+    track('picker_opened', { kind: 'birth' });
+  }
+
+  function closeBirthPicker() { $('birthPicker').hidden = true; }
+
+  function birthLabel() {
+    return pickState.y + '년 ' + pickState.m + '월 ' + pickState.d + '일';
+  }
+
+  /* =========================================================
+   * 9-3. 시진 피커
+   * ======================================================= */
+
+  var draft = { hourBranch: null, hourIndex: null, calendar: 'solar', leap: false, gender: null, birthTouched: false };
+
+  function openHourPicker() {
+    var box = $('hourList');
+    box.innerHTML = '';
+
+    var mk = function (branch, label, sub, idx) {
+      var on = (idx === null) ? (draft.hourIndex === null) : (draft.hourIndex === idx);
+      var b = doc.createElement('button');
+      b.type = 'button';
+      b.className = 'hour-item' + (on ? ' is-on' : '');
+      b.setAttribute('role', 'option');
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+      var t = doc.createElement('span');
+      t.className = 'hour-name';
+      t.textContent = label;
+      b.appendChild(t);
+      if (sub) {
+        var sEl = doc.createElement('span');
+        sEl.className = 'hour-range';
+        sEl.textContent = sub;
+        b.appendChild(sEl);
+      }
+      b.addEventListener('click', function () {
+        draft.hourBranch = branch;
+        draft.hourIndex = idx;
+        $('hourDisplay').textContent = branch ? (label + ' ' + sub) : '모름';
+        $('hourPicker').hidden = true;
+        track('hour_selected', { known: !!branch, night: idx === 0 });
+      });
+      return b;
+    };
+
+    box.appendChild(mk(null, '모름', '', null));
+    for (var i = 0; i < PF.HOURS.length; i++) {
+      var h = PF.HOURS[i];
+      box.appendChild(mk(h.branch, h.label, h.range, i));
+    }
+    $('hourPicker').hidden = false;
+    track('picker_opened', { kind: 'hour' });
+  }
+
+  /* =========================================================
+   * 9-4. 사주 분석 화면 (SA)
+   * ======================================================= */
+
+  function renderSA() {
+    if (!state.profile || !SJ || !MS) return;
+    var p = state.profile;
+    var pil = pillarsOf(p);
+    if (!pil) return;
+    state.pillars = pil;
+
+    $('saOwner').textContent = p.name;
+
+    var dayStem = pil.day.stem;
+    var st = SJ.strength(pil);
+    state.strength = st;
+
+    // 요약: 일간 + 월지 계절
+    var season = SJ.BRANCH_SEASON[pil.month.branch];
+    var elName = SJ.STEM_EL[dayStem];
+    $('saSummary').textContent = dayStem + elName + ' · ' + season + '의 기운';
+
+    // 키워드 칩 3개
+    var per = SJ.personality(dayStem, st.판정);
+    var chips = $('saChips');
+    chips.innerHTML = '';
+    for (var c = 0; c < per.키워드.length; c++) {
+      var chip = doc.createElement('span');
+      chip.className = 'chip';
+      chip.textContent = per.키워드[c];
+      chips.appendChild(chip);
+    }
+
+    // 내사주표 — 시/일/월/년 순(참고앱 구조)
+    var order = ['hour', 'day', 'month', 'year'];
+    var rowS = $('rowStem'), rowB = $('rowBranch');
+    rowS.innerHTML = ''; rowB.innerHTML = '';
+
+    for (var i = 0; i < order.length; i++) {
+      var key = order[i], col = pil[key];
+
+      var tdS = doc.createElement('td');
+      var tdB = doc.createElement('td');
+
+      if (!col) {                                  // 시주 모름
+        tdS.className = 'cell cell-unknown';
+        tdS.textContent = '모름';
+        tdB.className = 'cell cell-unknown';
+        tdB.textContent = '모름';
+        rowS.appendChild(tdS); rowB.appendChild(tdB);
+        continue;
+      }
+
+      var sEl = SJ.STEM_EL[col.stem], bEl = SJ.BRANCH_EL[col.branch];
+      var sGod = (key === 'day') ? '본인' : SJ.tenGod(dayStem, col.stem);
+      var bGod = SJ.branchTenGod(dayStem, col.branch);
+
+      tdS.className = 'cell el-' + sEl;
+      tdS.appendChild(cellInner(SJ.STEM_HANJA[col.stem], col.stem, sGod));
+      tdB.className = 'cell el-' + bEl;
+      tdB.appendChild(cellInner(SJ.BRANCH_HANJA[col.branch], col.branch, bGod));
+
+      rowS.appendChild(tdS);
+      rowB.appendChild(tdB);
+    }
+    $('saHourNote').hidden = !!pil.hour;
+
+    // 오행 분포
+    var cnt = SJ.elementCount(pil);
+    $('saElTotal').textContent = '(' + cnt.합계 + '글자 기준)';
+    var bars = $('saElBars');
+    bars.innerHTML = '';
+    for (var e = 0; e < SJ.EL_ORDER.length; e++) {
+      var el = SJ.EL_ORDER[e], n = cnt[el];
+      var row = doc.createElement('div');
+      row.className = 'el-row';
+
+      var nameEl = doc.createElement('span');
+      nameEl.className = 'el-name el-' + el;
+      nameEl.textContent = el + SJ.EL_HANJA[el];
+
+      var track2 = doc.createElement('span');
+      track2.className = 'el-track';
+      var fill = doc.createElement('span');
+      fill.className = 'el-fill el-bg-' + el;
+      fill.style.width = (cnt.합계 ? Math.round(n / cnt.합계 * 100) : 0) + '%';
+      track2.appendChild(fill);
+
+      var num = doc.createElement('span');
+      num.className = 'el-num' + (n === 0 ? ' is-zero' : '');
+      num.textContent = String(n);
+
+      row.appendChild(nameEl);
+      row.appendChild(track2);
+      row.appendChild(num);
+      bars.appendChild(row);
+    }
+
+    // 선천 성격
+    $('saPersona').textContent = per.본문;
+    $('saStrength').textContent = '기운의 세기: ' + st.판정
+      + ' (득령 ' + (st.득령 ? '○' : '×')
+      + ' · 득지 ' + (st.득지 ? '○' : '×')
+      + ' · 득세 ' + (st.득세 ? '○' : '×') + ')';
+
+    show('sa');
+
+    if (!reached.sa) {
+      reached.sa = true;
+      track('sa_reached', {
+        day_stem: dayStem, season: season, strength: st.판정,
+        el_total: cnt.합계, has_hour: !!pil.hour
+      });
+    }
+  }
+
+  function cellInner(hanja, korean, god) {
+    var wrap = doc.createElement('span');
+    wrap.className = 'cell-in';
+    var h = doc.createElement('span');
+    h.className = 'cell-hanja';
+    h.textContent = hanja;
+    var k = doc.createElement('span');
+    k.className = 'cell-kor';
+    k.textContent = korean;
+    var g = doc.createElement('span');
+    g.className = 'cell-god';
+    g.textContent = god || '';
+    wrap.appendChild(h); wrap.appendChild(k); wrap.appendChild(g);
+    return wrap;
+  }
+
   /* =========================================================
    * 8. 이벤트 바인딩
    * ======================================================= */
@@ -1187,10 +1676,6 @@
   $('btnShare').addEventListener('click', function () {
     track('share_clicked', { screen: 's2', card_id: state.guardian ? state.guardian.카드ID : null });
     win.alert('공유 링크가 준비되었습니다. (목업 — 실제 공유는 동작하지 않습니다)');
-  });
-  $('toS3').addEventListener('click', function () {
-    track('s2_to_s3');
-    renderS3();
   });
 
   // S3
@@ -1267,10 +1752,145 @@
   /* ---- 날짜 입력 max = 오늘 (C-⑨ / 변경 A) ---- */
   $('birth').setAttribute('max', today);
 
+
+  /* =========================================================
+   * 10. v3 이벤트 바인딩 (프로필 · 피커 · 사주)
+   * ======================================================= */
+
+  if (profiles) {
+    // --- S0 목록 ---
+    $('btnAddProfile').addEventListener('click', function () {
+      if (profiles.isFull()) {
+        win.alert('프로필은 최대 ' + PF.MAX_PROFILES + '명까지 저장할 수 있습니다.');
+        return;
+      }
+      // 입력 초안 초기화
+      draft = { hourBranch: null, hourIndex: null, calendar: 'solar', leap: false, gender: null, birthTouched: false };
+      pickState = { y: 1990, m: 1, d: 1 };
+      $('pName').value = '';
+      $('birthDisplay').textContent = '생년월일 선택';
+      $('hourDisplay').textContent = '모름';
+      $('pErr').hidden = true;
+      setSeg($('segCalendar'), 'cal', 'solar');
+      setSeg($('segGender'), 'gender', null);
+      track('profile_form_opened', {});
+      show('s0b');
+    });
+
+    // --- 세그먼트 버튼(달력·성별) ---
+    function setSeg(group, attr, value) {
+      var btns = group.querySelectorAll('.seg-btn');
+      for (var i = 0; i < btns.length; i++) {
+        var on = btns[i].dataset[attr] === value;
+        btns[i].classList[on ? 'add' : 'remove']('is-on');
+        btns[i].setAttribute('aria-pressed', on ? 'true' : 'false');
+      }
+    }
+
+    $('segCalendar').addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('.seg-btn') : null;
+      if (!b) return;
+      var v = b.dataset.cal;
+      draft.calendar = (v === 'solar') ? 'solar' : 'lunar';
+      draft.leap = (v === 'leap');
+      setSeg($('segCalendar'), 'cal', v);
+      $('pickHint').textContent = (v === 'solar')
+        ? '양력 기준 생년월일을 선택하세요.'
+        : (v === 'leap' ? '음력 윤달 기준 생년월일을 선택하세요.' : '음력 기준 생년월일을 선택하세요.');
+    });
+
+    $('segGender').addEventListener('click', function (e) {
+      var b = e.target.closest ? e.target.closest('.seg-btn') : null;
+      if (!b) return;
+      draft.gender = b.dataset.gender;
+      setSeg($('segGender'), 'gender', draft.gender);
+    });
+
+    // --- 생년월일 피커 ---
+    $('btnBirthPicker').addEventListener('click', openBirthPicker);
+    $('pickCancel').addEventListener('click', closeBirthPicker);
+    $('pickDone').addEventListener('click', function () {
+      draft.birthTouched = true;
+      $('birthDisplay').textContent = birthLabel();
+      closeBirthPicker();
+      track('birth_picked', {});   // C-⑤ 원문 미기록
+    });
+    attachSnap($('wheelY'), yearValues, function (v) { pickState.y = v; refreshDayWheel(); });
+    attachSnap($('wheelM'), monthValues, function (v) { pickState.m = v; refreshDayWheel(); });
+    attachSnap($('wheelD'), dayValues, function (v) { pickState.d = v; });
+
+    // --- 시진 피커 ---
+    $('btnHourPicker').addEventListener('click', openHourPicker);
+    $('hourCancel').addEventListener('click', function () { $('hourPicker').hidden = true; });
+
+    // --- 저장 ---
+    $('btnSaveProfile').addEventListener('click', function () {
+      var cand = {
+        name: $('pName').value,
+        year: pickState.y, month: pickState.m, day: pickState.d,
+        calendar: draft.calendar, leap: draft.leap,
+        hourBranch: draft.hourBranch, hourIndex: draft.hourIndex, gender: draft.gender,
+        __today: today
+      };
+      if (!draft.birthTouched) {
+        showPErr('생년월일을 선택해 주세요.');
+        return;
+      }
+      var res = profiles.add(cand);
+      if (!res.ok) { showPErr(res.error); return; }
+      $('pErr').hidden = true;
+      track('profile_created', {
+        calendar: cand.calendar, leap: cand.leap,
+        has_hour: !!cand.hourBranch, has_gender: !!cand.gender
+      });                                   // C-⑤ 생년월일 원문 미전송
+      renderProfileList();
+      selectProfile(res.profile.id);
+    });
+
+    function showPErr(msg) {
+      var el = $('pErr');
+      el.textContent = msg;
+      el.hidden = false;
+      track('profile_invalid', {});
+    }
+
+    $('btnCancelProfile').addEventListener('click', function () {
+      track('profile_form_cancelled', {});
+      show('s0');
+    });
+
+    // --- 사주 화면 이동 ---
+    $('toSa').addEventListener('click', function () {
+      track('s2_to_sa');
+      renderSA();
+    });
+    $('toS3FromSa').addEventListener('click', function () {
+      track('sa_to_s3');
+      renderS3();
+    });
+    $('backToS2FromSa').addEventListener('click', function () {
+      track('sa_to_s2');
+      show('s2');
+      $('cardFlip').classList.add('flipped');
+      $('s2Detail').classList.add('shown');
+    });
+
+    // 첫 화면 결정: 프로필이 있으면 목록, 없으면 입력 폼으로 바로
+    renderProfileList();
+  }
+
   /* ---- 기동 시 self-test ---- */
   var st = runSelfTest();
   win.SMOKE.selfTestResult = st;
   if (st.실패 > 0) track('selftest_failed', { failed: st.실패, total: st.전체 });
+
+  // 사주 엔진(십성·오행·성격) self-test도 함께 돌린다 — 콘솔 1줄로 재현 가능
+  var sj = getSaju();
+  if (sj && sj.selfTest) {
+    var sjr = sj.selfTest();
+    win.SMOKE.sajuSelfTest = sjr;
+    if (sjr.실패 > 0) track('saju_selftest_failed', { failed: sjr.실패, total: sjr.전체 });
+  }
 
   return ENGINE;
 });

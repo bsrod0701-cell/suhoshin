@@ -12,8 +12,66 @@
 
 <main id="app">
 
+  <!-- ===== S0 프로필 목록 (다중 사용자) ===== -->
+  <section class="screen is-active" id="s0">
+    <div class="wrap">
+      <p class="brand">내 수호신</p>
+      <h1 class="head">누구의 사주를<br>볼까요?</h1>
+
+      <div class="profile-list" id="profileList"></div>
+
+      <button class="btn btn-main" id="btnAddProfile">새 사용자 추가</button>
+      <p class="tiny center">프로필은 이 기기에만 저장되며 서버로 보내지 않습니다.</p>
+    </div>
+  </section>
+
+  <!-- ===== S0b 프로필 입력 ===== -->
+  <section class="screen" id="s0b">
+    <div class="wrap">
+      <p class="eyebrow">새 사용자</p>
+
+      <label class="lbl" for="pName">이름</label>
+      <input class="field" type="text" id="pName" maxlength="12" placeholder="이름을 입력하세요"
+             autocomplete="off" enterkeyhint="done">
+
+      <label class="lbl" id="lblBirth">생년월일</label>
+      <button class="picker-open" id="btnBirthPicker" type="button" aria-labelledby="lblBirth">
+        <span id="birthDisplay">생년월일 선택</span>
+        <span class="picker-caret" aria-hidden="true">▾</span>
+      </button>
+
+      <fieldset class="seg-set">
+        <legend class="lbl">달력 기준</legend>
+        <div class="seg" id="segCalendar" role="group">
+          <button type="button" class="seg-btn is-on" data-cal="solar">양력</button>
+          <button type="button" class="seg-btn" data-cal="lunar">음력</button>
+          <button type="button" class="seg-btn" data-cal="leap">음력 윤달</button>
+        </div>
+      </fieldset>
+
+      <label class="lbl" id="lblHour">태어난 시각</label>
+      <button class="picker-open" id="btnHourPicker" type="button" aria-labelledby="lblHour">
+        <span id="hourDisplay">모름</span>
+        <span class="picker-caret" aria-hidden="true">▾</span>
+      </button>
+      <p class="tiny">모르면 그대로 두셔도 됩니다. 시주를 뺀 나머지로 풀이합니다.</p>
+
+      <fieldset class="seg-set">
+        <legend class="lbl">성별</legend>
+        <div class="seg" id="segGender" role="group">
+          <button type="button" class="seg-btn" data-gender="F">여자</button>
+          <button type="button" class="seg-btn" data-gender="M">남자</button>
+        </div>
+      </fieldset>
+
+      <p class="err" id="pErr" hidden>입력을 확인해 주세요.</p>
+      <button class="btn btn-main" id="btnSaveProfile">저장하고 시작하기</button>
+      <button class="btn btn-ghost" id="btnCancelProfile">취소</button>
+    </div>
+  </section>
+
   <!-- ===== S1 생년월일 입력 ===== -->
-  <section class="screen is-active" id="s1">
+  <section class="screen" id="s1">
     <div class="wrap">
       <p class="brand">내 수호신</p>
       <h1 class="head">3초 만에<br>내 수호신을 찾으세요</h1>
@@ -70,8 +128,53 @@
           <button class="btn btn-ghost" id="btnSave">저장하기</button>
           <button class="btn btn-ghost" id="btnShare">공유하기</button>
         </div>
-        <button class="btn btn-main" id="toS3">오늘의 흐름 보기</button>
+        <button class="btn btn-main" id="toSa">내 사주 보기</button>
       </div>
+    </div>
+  </section>
+
+  <!-- ===== SA 사주 분석 (신설 — S2 수호신 다음) ===== -->
+  <section class="screen" id="sa">
+    <div class="wrap">
+      <p class="eyebrow"><span id="saOwner">—</span> 님의 사주</p>
+
+      <!-- 사주 요약 -->
+      <h2 class="saju-title" id="saSummary">—</h2>
+      <div class="chips" id="saChips"></div>
+
+      <!-- 내사주표: 4기둥 x 천간/지지 -->
+      <div class="pillar-wrap">
+        <table class="pillar-table">
+          <caption class="sr-only">시주·일주·월주·년주의 천간과 지지</caption>
+          <thead>
+            <tr><th scope="col">시주</th><th scope="col">일주</th><th scope="col">월주</th><th scope="col">년주</th></tr>
+          </thead>
+          <tbody>
+            <tr id="rowStem"></tr>
+            <tr id="rowBranch"></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="tiny center" id="saHourNote" hidden>태어난 시각을 모르면 시주는 빼고 풀이합니다.</p>
+
+      <!-- 오행 분포 -->
+      <h3 class="sec-title">오행 분포 <span class="sec-sub" id="saElTotal"></span></h3>
+      <div class="el-bars" id="saElBars"></div>
+
+      <!-- 선천 성격 -->
+      <h3 class="sec-title">타고난 성격</h3>
+      <p class="prose" id="saPersona">—</p>
+      <p class="tiny" id="saStrength">—</p>
+
+      <!-- 잠금 대신 부적 연결(우리 결착: 풀이 무료·소장 과금) -->
+      <div class="rx" id="saRx">
+        <p class="rx-copy">풀이는 전부 무료입니다.</p>
+        <p class="rx-target">오늘의 흐름을 보고, 마음에 드는 <span>부적</span>은 소장하실 수 있습니다.</p>
+      </div>
+
+      <button class="btn btn-main" id="toS3FromSa">오늘의 흐름 보기</button>
+      <button class="btn btn-ghost" id="backToS2FromSa">내 수호신 다시 보기</button>
+      <p class="tiny center">재미와 마음의 위안을 위한 콘텐츠입니다.</p>
     </div>
   </section>
 
@@ -157,6 +260,36 @@
 
 </main>
 
+<!-- 생년월일 3열 휠 피커 -->
+<div class="sheet" id="birthPicker" hidden role="dialog" aria-modal="true" aria-label="생년월일 선택">
+  <div class="sheet-inner">
+    <div class="sheet-head">
+      <button class="sheet-btn" id="pickCancel" type="button">취소</button>
+      <p class="sheet-title">생년월일</p>
+      <button class="sheet-btn is-primary" id="pickDone" type="button">선택 완료</button>
+    </div>
+    <p class="tiny center" id="pickHint">달력 기준에 맞는 생년월일을 선택하세요.</p>
+    <div class="wheels">
+      <div class="wheel" id="wheelY" tabindex="0" role="listbox" aria-label="년"></div>
+      <div class="wheel" id="wheelM" tabindex="0" role="listbox" aria-label="월"></div>
+      <div class="wheel" id="wheelD" tabindex="0" role="listbox" aria-label="일"></div>
+      <div class="wheel-mask" aria-hidden="true"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 12지 시진 목록 -->
+<div class="sheet" id="hourPicker" hidden role="dialog" aria-modal="true" aria-label="태어난 시각 선택">
+  <div class="sheet-inner">
+    <div class="sheet-head">
+      <button class="sheet-btn" id="hourCancel" type="button">취소</button>
+      <p class="sheet-title">태어난 시각</p>
+      <span class="sheet-btn is-ghost" aria-hidden="true"></span>
+    </div>
+    <div class="hour-list" id="hourList" role="listbox" aria-label="시진"></div>
+  </div>
+</div>
+
 <!-- 개발자용 숨김 계측 패널 (5회 탭) -->
 <button id="devDot" aria-hidden="true" tabindex="-1" title=""></button>
 <div id="devPanel" hidden>
@@ -171,6 +304,9 @@
   </div>
 </div>
 
+<script src="vendor/manseryeok.js"></script>
+<script src="saju.js"></script>
+<script src="profile.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
