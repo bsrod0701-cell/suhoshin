@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐉</text></svg>">
+<title>내 수호신</title>
+<meta name="description" content="생년월일로 3초 만에 내 수호신을 찾고, 오늘의 흐름을 확인하세요.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<main id="app">
+
+  <!-- ===== S1 생년월일 입력 ===== -->
+  <section class="screen is-active" id="s1">
+    <div class="wrap">
+      <p class="brand">내 수호신</p>
+      <h1 class="head">3초 만에<br>내 수호신을 찾으세요</h1>
+
+      <form id="birthForm" novalidate>
+        <label class="lbl" for="birth">생년월일</label>
+        <input class="field" type="date" id="birth" name="birth"
+               min="1900-01-01" required autocomplete="bday">
+        <p class="err" id="birthErr" hidden>생년월일을 확인해 주세요.</p>
+
+        <details class="opt">
+          <summary>시간 · 성별 (선택 입력)</summary>
+          <div class="opt-body">
+            <label class="lbl2" for="btime">태어난 시각</label>
+            <input class="field" type="time" id="btime">
+            <label class="lbl2" for="gender">성별</label>
+            <select class="field" id="gender">
+              <option value="">선택 안 함</option>
+              <option value="F">여성</option>
+              <option value="M">남성</option>
+            </select>
+            <p class="tiny">선택 입력은 결과를 더 정교하게 다듬는 데 쓰입니다. 비워두어도 됩니다.</p>
+          </div>
+        </details>
+
+        <button class="btn btn-main" type="submit">내 수호신 찾기</button>
+      </form>
+
+      <p class="tiny center">재미와 마음의 위안을 위한 콘텐츠입니다.</p>
+    </div>
+  </section>
+
+  <!-- ===== S2 수호신 공개 (정체성) ===== -->
+  <section class="screen" id="s2">
+    <div class="wrap">
+      <p class="eyebrow">당신의 수호신</p>
+
+      <div class="cardbox" id="revealBox">
+        <div class="card-flip" id="cardFlip">
+          <div class="card-face card-back"><span class="seal">守</span></div>
+          <div class="card-face card-front">
+            <img id="guardImg" alt="수호신 카드" decoding="async">
+          </div>
+        </div>
+      </div>
+
+      <div class="reveal-late" id="s2Detail">
+        <h2 class="name" id="guardName">—</h2>
+        <p class="sub" id="guardSub">—</p>
+        <ul class="traits" id="guardTraits"></ul>
+        <p class="note">오행 대표 카드 — 60갑자 전용 아트는 제작 예정</p>
+
+        <div class="row">
+          <button class="btn btn-ghost" id="btnSave">저장하기</button>
+          <button class="btn btn-ghost" id="btnShare">공유하기</button>
+        </div>
+        <button class="btn btn-main" id="toS3">오늘의 흐름 보기</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== S3 오늘의 흐름 (진단 · 신설) ===== -->
+  <section class="screen" id="s3">
+    <div class="wrap">
+      <p class="eyebrow"><span id="flowDate">—</span> 오늘의 흐름</p>
+
+      <!-- 시그니처: 한지가 펼쳐지고 인장이 찍히는 점수 공개 -->
+      <div class="flow-panel" id="flowPanel">
+        <div class="score-line">
+          <span class="score" id="flowScore">—</span>
+          <span class="score-unit">점</span>
+          <span class="score-seal" id="scoreSeal" aria-hidden="true">吉</span>
+        </div>
+        <p class="ganji" id="flowGanji">—</p>
+        <p class="flow-summary" id="flowSummary">—</p>
+      </div>
+
+      <div class="area-list" id="areaList"></div>
+
+      <details class="why" id="whyToggle">
+        <summary>왜 이 점수?</summary>
+        <p class="why-line" id="whyLine">—</p>
+      </details>
+
+      <button class="btn btn-main" id="toS4">오늘의 부적 보기</button>
+      <button class="btn btn-ghost" id="backToS2">내 수호신 다시 보기</button>
+
+      <p class="tiny center">재미와 마음의 위안을 위한 콘텐츠입니다.</p>
+    </div>
+  </section>
+
+  <!-- ===== S4 오늘의 부적 + 목적 부적 (처방 · 과금) ===== -->
+  <section class="screen" id="s4">
+    <div class="wrap">
+      <p class="eyebrow" id="todayLabel">오늘의 부적</p>
+
+      <div class="cardbox small">
+        <img id="talismanImg" class="talisman" alt="오늘의 부적" decoding="async">
+      </div>
+
+      <h2 class="name" id="talismanName">—</h2>
+      <p class="oneline" id="talismanLine">—</p>
+      <p class="note">오행 대표 카드 — 60갑자 전용 아트는 제작 예정</p>
+
+      <!-- 진단 -> 처방 연결 -->
+      <div class="rx" id="rxBox" hidden>
+        <p class="rx-copy" id="rxCopy">—</p>
+        <p class="rx-target"><span id="rxTarget">—</span> 준비 중</p>
+      </div>
+
+      <div class="offer" id="offerBox">
+        <p class="offer-title" id="offerTitle">—</p>
+        <p class="offer-desc" id="offerDesc">—</p>
+        <button class="btn btn-main" id="btnCta">—</button>
+        <p class="tiny center">무료 저해상 저장은 계속 가능합니다.</p>
+      </div>
+
+      <div class="shelf">
+        <h3 class="shelf-title">다가오는 중요한 날이 있나요?</h3>
+        <div class="shelf-row" id="shelfRow"></div>
+        <p class="tiny">목적 부적은 준비 중입니다.</p>
+      </div>
+
+      <button class="btn btn-ghost" id="backToS3">오늘의 흐름 다시 보기</button>
+    </div>
+  </section>
+
+  <!-- ===== S5 결제 의향 (무결제) ===== -->
+  <section class="screen" id="s5">
+    <div class="wrap narrow">
+      <div class="prep">
+        <p class="eyebrow">준비 중입니다</p>
+        <h2 class="head sm">오픈하면<br>알려드릴까요?</h2>
+        <p class="sub" id="prepDesc">—</p>
+        <button class="btn btn-main" id="btnNotify">알림 받기</button>
+        <p class="ok" id="notifyOk" hidden>신청되었습니다. 오픈 소식을 가장 먼저 전해드릴게요.</p>
+        <button class="btn btn-ghost" id="backFromS5">돌아가기</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- 개발자용 숨김 계측 패널 (5회 탭) -->
+<button id="devDot" aria-hidden="true" tabindex="-1" title=""></button>
+<div id="devPanel" hidden>
+  <div class="dev-inner">
+    <p class="dev-head">SMOKE LOG</p>
+    <textarea id="devJson" readonly></textarea>
+    <div class="row">
+      <button class="btn btn-ghost sm" id="devCopy">JSON 복사</button>
+      <button class="btn btn-ghost sm" id="devClose">닫기</button>
+    </div>
+    <p class="tiny" id="devMeta"></p>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
