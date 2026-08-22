@@ -834,6 +834,18 @@
   var arm = ARMS[hash32('arm:' + anonId) % 3];
   var offer = OFFERS[arm];
 
+  /* v6 — 가호 미리보기 A/B 분기 (스펙 4장, 레드팀 R5 필수 요구)
+   * 상품×가격 분기(arm)와 **독립 축**이며 같은 결정론 해시 방식을 쓴다.
+   * seed를 'blessing:'으로 달리해 arm과 상관되지 않게 한다.
+   *
+   * ★ 킬 조건(첫 클릭 3% · 잔존 30% · 완주 40%) 판정은 **미노출군(off) 기준**으로 고정한다.
+   *   가호가 지표를 인위적으로 부양해도 판별력이 남아야 하기 때문이다.
+   *   노출군(on)은 가호 효과 관찰용이며, 기존 지표의 분모·분자 정의는 바뀌지 않는다
+   *   — variant는 이벤트 파라미터로만 병기된다. */
+  var BLESSING_VARIANTS = ['off', 'on'];
+  var blessingVariant = BLESSING_VARIANTS[hash32('blessing:' + anonId) % 2];
+  var showBlessing = (blessingVariant === 'on');
+
   /* ---- C-④ 코호트 (KST 고정) ---- */
   var today = todayKST();                    // 자정 넘김 대비: track()마다 재계산한다
   var firstSeen = store.get(LS.firstSeen);
@@ -900,6 +912,7 @@
       anon_id: anonId,
       session: sessionId,
       arm: arm,
+      variant: blessingVariant,   // v6: 가호 A/B 태그(기존 지표 정의 무변경 — 파라미터 추가만)
       // C-④ 코호트 필드 — 모든 이벤트에 포함
       first_seen_at: firstSeen,
       cohort_date: firstSeen,
@@ -1194,6 +1207,71 @@
     }
   }
 
+  /* =========================================================
+   * v6 가호 미리보기 헬퍼 (스펙 3장)
+   * ★ 구매 전 판매 표면에는 관계 등급과 이유만 넣는다.
+   *   숫자·화살표·+N 등 수치 인과 표기는 절대 금지(레드팀 결착·표시광고법).
+   * ======================================================= */
+  var EL_TAL_ID = { '목': 'el_목', '화': 'el_화', '토': 'el_토', '금': 'el_금', '수': 'el_수' };
+  var PURPOSE_TAL_ID = { '합격': 'pp_합격', '면접': 'pp_면접', '재물': 'pp_재물', '연애': 'pp_연애' };
+
+  /** 오늘 기준 가호 등급. 미노출군이거나 엔진이 없으면 null. */
+  function blessingFor(talId) {
+    if (!showBlessing) return null;              // 미노출군은 계산조차 하지 않는다
+    var SJb = getSaju();
+    if (!SJb || !SJb.blessingTier || !state.guardian) return null;
+    var t = read(today);
+    return SJb.blessingTier(talId, state.guardian, t);
+  }
+
+  /** 타일에 관계 문양 뱃지를 붙인다(S4·홈 공용 규격). 숫자 금지.
+   * 미노출군이면 아무것도 하지 않는다. 붙였으면 tier를 돌려준다. */
+  function attachTierMark(tile, talId) {
+    var tb = blessingFor(talId);
+    if (!tb) return null;
+    var mk = doc.createElement('span');
+    mk.className = 'tier-mark tier-' + (tb.tier === '大' ? 'dae' : tb.tier === '中' ? 'jung' : 'so');
+    mk.setAttribute('data-tier', tb.tier);
+    mk.setAttribute('data-tal', talId);
+    mk.textContent = tb.tier;
+    tile.appendChild(mk);
+    trackBlessingView(talId, tb.tier);
+    return tb.tier;
+  }
+
+  /** 진열대에서 오늘 大인 타일 중 **1개만** 미세 강조한다.
+   * 전 타일 동시 강조는 게임화로 읽혀 구매 압박이 되므로 금지(레드팀 R3).
+   * 선택은 DOM 순서상 첫 번째 大 — 결정론이라 새로고침해도 같은 타일이 강조된다. */
+  function highlightSingleDae() {
+    /* 컨테이너를 여러 개 받아 **합산 기준**으로 1개만 고른다.
+     * 홈은 오행 5종(shopRow)+목적 4종(shopPurpose)이 나뉘어 있어
+     * 각각 돌리면 강조가 2개가 된다 — 그래서 가변 인자로 받는다. */
+    var marks = [];
+    for (var h = 0; h < arguments.length; h++) {
+      var host = arguments[h];
+      if (!host) continue;
+      var found = host.querySelectorAll('.tier-mark');
+      for (var f = 0; f < found.length; f++) marks.push(found[f]);
+    }
+    var picked = false;
+    for (var i = 0; i < marks.length; i++) {
+      var m = marks[i];
+      m.classList.remove('is-today-dae');
+      if (!picked && m.getAttribute('data-tier') === '大') {
+        m.classList.add('is-today-dae');
+        picked = true;
+      }
+    }
+  }
+
+  /** 카드 최초 노출 시 세션당 부적별 1회만 기록(codex 시점 정의) */
+  var blessingSeen = {};
+  function trackBlessingView(talId, tier) {
+    if (!showBlessing || !talId || blessingSeen[talId]) return;
+    blessingSeen[talId] = true;
+    track('blessing_preview_viewed', { talisman_id: talId, tier: tier });
+  }
+
   /* ---- S4 렌더: 오늘의 부적 + 목적 부적 ---- */
   function renderS4() {
     if (!state.talisman) return;
@@ -1218,6 +1296,22 @@
       rx.hidden = true;
     }
 
+    /* v6 — 오늘의 가호(관계 등급 + 이유 1줄). 미노출군은 요소 자체를 숨긴다.
+     * 숫자·화살표는 넣지 않는다(구매 전 판매 표면 수치 인과 금지). */
+    var mainTalId = EL_TAL_ID[needEl];
+    var bl = blessingFor(mainTalId);
+    if (bl) {
+      $('blessingMark').textContent = bl.tier;
+      $('blessingLabel').textContent = bl.tier + ' — ' + bl.label;
+      $('blessingWhy').textContent = bl.이유;
+      $('blessingBox').hidden = false;
+      $('blessingNote').hidden = false;
+      trackBlessingView(mainTalId, bl.tier);
+    } else {
+      $('blessingBox').hidden = true;
+      $('blessingNote').hidden = true;
+    }
+
     $('offerTitle').textContent = offer.title;
     $('offerDesc').textContent = offer.desc;
     $('btnCta').textContent = offer.cta;
@@ -1240,8 +1334,13 @@
       s.textContent = item.icon;
       d.appendChild(s);
       d.appendChild(doc.createTextNode(item.label));
+
+      /* v6 — 관계 문양 뱃지(숫자 금지). 大 강조는 뒤에서 1개만 남긴다. */
+      attachTierMark(d, PURPOSE_TAL_ID[item.label]);
       shelf.appendChild(d);
     }
+    /* 오늘 大인 부적이 여럿이어도 강조는 1개만(전 타일 동시 강조 금지 — 레드팀 R3 게임화 방지) */
+    highlightSingleDae(shelf);
 
     show('s4');
 
@@ -1915,6 +2014,18 @@
         lvEl.textContent = lv;
         head.appendChild(mk); head.appendChild(nm); head.appendChild(lvEl);
 
+        /* v6 — 영역 점수(비중첩 대역). 가호가 아니므로 양군 공통으로 노출한다. */
+        var SJn = getSaju();
+        if (SJn && SJn.areaScore) {
+          var av = SJn.areaScore(area, lv, t.갑자순번, state.guardian.갑자순번);
+          if (av !== null) {
+            var numEl = doc.createElement('span');
+            numEl.className = 'area-card-score';
+            numEl.textContent = String(av);
+            head.appendChild(numEl);
+          }
+        }
+
         var q = doc.createElement('span');
         q.className = 'area-card-q';
         q.textContent = AREA_QUESTION[area];
@@ -1967,6 +2078,8 @@
         cap.className = 'shop-cap';
         cap.textContent = el + SJx.EL_HANJA[el];
         it.appendChild(im); it.appendChild(cap);
+        /* v6 스펙 §3 — 홈 진열대에도 관계 문양 뱃지(노출군 한정, 숫자 금지) */
+        attachTierMark(it, EL_TAL_ID[el]);
         it.addEventListener('click', function () {
           track('shop_item_clicked', { element: el, today: ctx.need && ctx.need.오행 === el });
           renderS4();
@@ -1987,6 +2100,7 @@
         sp.textContent = item.icon;
         d.appendChild(sp);
         d.appendChild(doc.createTextNode(item.label));
+        attachTierMark(d, PURPOSE_TAL_ID[item.label]);
         d.addEventListener('click', function () {
           track('shop_purpose_clicked', { purpose: item.label });
           renderS4();
@@ -1994,6 +2108,10 @@
         purpose.appendChild(d);
       })(PURPOSE_SHELF[pi]);
     }
+
+    /* 홈 大 강조도 1개만 — 오행 5종 + 목적 4종을 **합산** 기준으로 센다(스펙 §3).
+     * 두 컨테이너를 각각 돌리면 최대 2개가 강조되므로 함께 넘긴다. */
+    highlightSingleDae(shop, purpose);
 
     show('sh');
     // 홈에 들어오면 다른 화면의 홈 버튼을 노출한다
@@ -2098,8 +2216,11 @@
     $('sdEyebrow').textContent = today.replace(/-/g, '. ') + ' 오늘의 ' + area + '운';
     $('sdTitle').textContent = area + '운 · ' + lv;
 
-    // 등급 게이지 3구간 (금색 hairline, 인라인 SVG)
-    renderGauge($('sdGauge'), lv);
+    // 등급 게이지 3구간 (금색 hairline, 인라인 SVG) + v6 영역 점수 병기
+    var SJs = SJx;
+    var sdScore = (SJs && SJs.areaScore)
+      ? SJs.areaScore(area, lv, t.갑자순번, state.guardian.갑자순번) : null;
+    renderGauge($('sdGauge'), lv, sdScore);
 
     // 영역 프로즈 — 내 일간 × 오늘 천간의 십성
     var god = SJx.areaGodOf(state.guardian.일간, t.일간);
@@ -2154,7 +2275,7 @@
   }
 
   /** 등급 게이지 — 3구간(주의/보통/좋음) 중 현재 위치 강조 */
-  function renderGauge(host, level) {
+  function renderGauge(host, level, score) {
     host.innerHTML = '';
     var W = 280, H = 34, segW = (W - 4) / 3;
     var order = ['주의', '보통', '좋음'];
@@ -2181,6 +2302,14 @@
       svg.appendChild(tx);
     }
     host.appendChild(svg);
+    /* v6 — 게이지 옆 숫자 병기(양군 공통). 등급이 정한 대역 안의 값이라
+     * 등급-숫자 역전이 구조적으로 생기지 않는다. */
+    if (score !== null && score !== undefined) {
+      var sc = doc.createElement('p');
+      sc.className = 'gauge-score';
+      sc.textContent = String(score) + '점';
+      host.appendChild(sc);
+    }
   }
 
   /* =========================================================

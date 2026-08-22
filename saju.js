@@ -830,6 +830,140 @@
     };
   }
 
+
+  /* =========================================================
+   * 13. v6 — 영역 점수 숫자화 (스펙 1장)
+   *
+   * 비중첩 대역(codex ㉮3): 주의 30~49 / 보통 50~69 / 좋음 70~95.
+   * 대역이 겹치지 않으므로 "등급-숫자 역전"을 기계로 검사할 수 있다.
+   * 완전 공식(codex ㉮5): min + hash % (max - min + 1) — 대역 내 전 값 도달 가능.
+   * 날짜 기준은 KST 자정 갱신(호출부가 KST today를 넘긴다).
+   * ======================================================= */
+
+  var AREA_BAND = {
+    '주의': { min: 30, max: 49 },
+    '보통': { min: 50, max: 69 },
+    '좋음': { min: 70, max: 95 }
+  };
+  var AREA_INDEX = { '재물': 0, '애정': 1, '일': 2, '건강': 3 };
+
+  /**
+   * 영역 점수 — 등급이 정한 대역 안에서 결정론적으로 한 값을 고른다.
+   * 점수가 등급을 바꾸지 않는다(등급이 먼저, 숫자는 그 안의 표현).
+   * @param area  '재물'|'애정'|'일'|'건강'
+   * @param level '좋음'|'보통'|'주의'
+   * @param todayNo 오늘 일진 갑자순번
+   * @param myNo    내 일주 갑자순번
+   */
+  function areaScore(area, level, todayNo, myNo) {
+    var band = AREA_BAND[level];
+    if (!band) return null;
+    var idx = AREA_INDEX[area];
+    if (idx === undefined) return null;
+    var span = band.max - band.min + 1;
+    // (일진 순번 + 일주 순번×2 + 영역 인덱스) 기반 완전 공식
+    var h = mod(todayNo + myNo * 2 + idx * 17, span);
+    return band.min + h;
+  }
+
+  /* =========================================================
+   * 14. v6 — 가호 관계 엔진 blessingTier (스펙 2장)
+   *
+   * ★ 이 함수는 '관계 등급'만 돌려준다. 숫자 폭 산출은 이번 범위 밖이며
+   *   구매 후 화면(구축 단계) 스펙으로 이관됐다(레드팀 결착).
+   *   구매 전 판매 표면에 수치 인과("N→M", "+K")를 넣으면 표시광고법
+   *   리스크가 생긴다는 것이 이 분리의 이유다.
+   *
+   * F = 부적 오행 / T = 오늘 일진 천간 오행 / M = 내 일간 오행
+   *  · F↔T 상생(양방향) = 大 / F=T 비화 = 中 / F↔T 상극 = 小
+   *  · F가 M을 생하면 1단 승급(大는 大 유지 — codex ㉮4)
+   *  · baseTier / bonusApplied / finalTier 분리 반환
+   * ======================================================= */
+
+  var TIER_ORDER = ['小', '中', '大'];
+
+  // 부적 9종 — 오행부적 5종 + 목적부적 4종(합격·면접 모두 '일' 담당)
+  var TALISMANS = [
+    { id: 'el_목', kind: 'element', label: '목木 기운의 부적', element: '목' },
+    { id: 'el_화', kind: 'element', label: '화火 기운의 부적', element: '화' },
+    { id: 'el_토', kind: 'element', label: '토土 기운의 부적', element: '토' },
+    { id: 'el_금', kind: 'element', label: '금金 기운의 부적', element: '금' },
+    { id: 'el_수', kind: 'element', label: '수水 기운의 부적', element: '수' },
+    { id: 'pp_합격', kind: 'purpose', label: '합격 부적', area: '일' },
+    { id: 'pp_면접', kind: 'purpose', label: '면접 부적', area: '일' },
+    { id: 'pp_재물', kind: 'purpose', label: '재물 부적', area: '재물' },
+    { id: 'pp_연애', kind: 'purpose', label: '연애 부적', area: '애정' }
+  ];
+
+  function talismanById(id) {
+    for (var i = 0; i < TALISMANS.length; i++) if (TALISMANS[i].id === id) return TALISMANS[i];
+    return null;
+  }
+
+  /** 부적의 오행 F — 오행부적은 자기 오행, 목적부적은 담당 영역 십성군의 오행 */
+  function talismanElement(tal, myEl) {
+    if (!tal) return null;
+    if (tal.kind === 'element') return tal.element;
+    return elementOfGroup(myEl, AREA_GOD[tal.area]);
+  }
+
+  /** 관계 등급 문구 — 숫자·화살표 없이 관계만 말한다(스펙 3장) */
+  var TIER_LABEL = {
+    '大': '크게 받쳐주는 날',
+    '中': '곁을 지키는 날',
+    '小': '은은하게 머무는 날'
+  };
+
+  /**
+   * 가호 관계 등급.
+   * @param talId  부적 id
+   * @param mine   내 일주 정보 {일간}
+   * @param todayP 오늘 일진 정보 {일간}
+   * @returns {tier, baseTier, bonusApplied, finalTier, label, 이유, F, T, M}
+   */
+  function blessingTier(talId, mine, todayP) {
+    var tal = talismanById(talId);
+    if (!tal || !mine || !todayP) return null;
+    var M = STEM_EL[mine.일간];
+    var T = STEM_EL[todayP.일간];
+    var F = talismanElement(tal, M);
+    if (!M || !T || !F) return null;
+
+    // 1) 기본 등급 — 부적 오행 F와 오늘 기운 T의 관계
+    var base;
+    if (F === T) base = '中';
+    else if (SAENG[F] === T || SAENG[T] === F) base = '大';   // 상생 양방향
+    else base = '小';                                          // 나머지 = 상극 관계
+
+    // 2) 승급 — F가 나(M)를 생하면 한 단계. 大는 大 유지.
+    var helpsMe = (SAENG[F] === M);
+    var idx = TIER_ORDER.indexOf(base);
+    var finalIdx = helpsMe ? Math.min(TIER_ORDER.length - 1, idx + 1) : idx;
+    var fin = TIER_ORDER[finalIdx];
+    var bonusApplied = helpsMe && fin !== base;
+
+    // 3) 이유 1줄 — finalTier와 반드시 일치. 숫자·화살표 금지, 약속형 금지.
+    var reason;
+    if (bonusApplied) {
+      reason = '오늘 기운과는 ' + (base === '小' ? '부딪히는 자리지만' : '나란한 자리지만')
+        + ' 내 기운을 돕는 부적이라 한 단계 크게 받쳐줍니다.';
+    } else if (fin === '大') {
+      reason = helpsMe
+        ? '오늘 기운과 서로 살리는 관계이고 내 기운과도 결이 맞는 부적입니다.'
+        : '오늘 기운과 서로 살리는 관계라 특히 잘 어울리는 부적입니다.';
+    } else if (fin === '中') {
+      reason = '오늘 기운과 같은 결이라 무리 없이 곁을 지켜 줍니다.';
+    } else {
+      reason = '오늘 기운과는 결이 다르지만 조용히 곁에 머무는 부적입니다.';
+    }
+
+    return {
+      tier: fin, baseTier: base, bonusApplied: bonusApplied, finalTier: fin,
+      label: TIER_LABEL[fin], 이유: reason,
+      F: F, T: T, M: M
+    };
+  }
+
   /* =========================================================
    * 7. 자체 검증 (리포트 표와 전수 대조 — 콘솔 self-test)
    * ======================================================= */
@@ -1265,6 +1399,147 @@
     check('행운 수리 통설 금=4·9', luckOf('금').숫자.join(','), '4,9');
     check('행운 수리 통설 수=1·6', luckOf('수').숫자.join(','), '1,6');
 
+
+    /* ---------- v6-1: 영역 점수 숫자화 (스펙 1장) ---------- */
+    var LVS = ['주의', '보통', '좋음'];
+    check('대역 3종 정의', Object.keys(AREA_BAND).length, 3);
+    // 비중첩 — 등급-숫자 역전이 구조적으로 불가능함을 상수로 확인
+    check('대역 비중첩 주의<보통', AREA_BAND['주의'].max < AREA_BAND['보통'].min, 'true');
+    check('대역 비중첩 보통<좋음', AREA_BAND['보통'].max < AREA_BAND['좋음'].min, 'true');
+    check('대역 값 주의 30~49', AREA_BAND['주의'].min + '~' + AREA_BAND['주의'].max, '30~49');
+    check('대역 값 보통 50~69', AREA_BAND['보통'].min + '~' + AREA_BAND['보통'].max, '50~69');
+    check('대역 값 좋음 70~95', AREA_BAND['좋음'].min + '~' + AREA_BAND['좋음'].max, '70~95');
+
+    var asOut = 0, asNotFull = 0, asTotal = 0, asInvert = 0;
+    for (var aa = 0; aa < AREAS.length; aa++) {
+      for (var ll = 0; ll < LVS.length; ll++) {
+        var bnd = AREA_BAND[LVS[ll]];
+        var got = {}, cnt2 = 0;
+        for (var tt = 1; tt <= 60; tt++) {
+          for (var mm2 = 1; mm2 <= 60; mm2++) {
+            var v = areaScore(AREAS[aa], LVS[ll], tt, mm2);
+            asTotal++;
+            if (!(v >= bnd.min && v <= bnd.max)) asOut++;
+            // 역전: 낮은 등급 값이 높은 등급 대역에 들어가는가
+            if (LVS[ll] === '주의' && v >= AREA_BAND['보통'].min) asInvert++;
+            if (LVS[ll] === '보통' && v >= AREA_BAND['좋음'].min) asInvert++;
+            if (!got[v]) { got[v] = 1; cnt2++; }
+          }
+        }
+        if (cnt2 !== (bnd.max - bnd.min + 1)) asNotFull++;
+      }
+    }
+    check('영역점수 전수', asTotal, 43200);
+    check('영역점수 대역 이탈', asOut, 0);
+    check('영역점수 등급-숫자 역전', asInvert, 0);
+    check('영역점수 대역 내 전 값 도달', asNotFull, 0);
+    var asDet = areaScore('재물', '보통', 5, 16), asOk = true;
+    for (var az = 0; az < 200; az++) if (areaScore('재물', '보통', 5, 16) !== asDet) { asOk = false; break; }
+    check('영역점수 결정론 200회', asOk, 'true');
+    check('영역점수 잘못된 등급 null', areaScore('재물', '없음', 5, 16), 'null');
+
+    /* ---------- v6-2: 가호 관계 엔진 (스펙 2장, 2,700 전수) ---------- */
+    check('부적 9종', TALISMANS.length, 9);
+    check('등급 3종', TIER_ORDER.join(''), '小中大');
+    var M5 = ['갑', '병', '무', '경', '임'];   // 오행 5종 대표 일간
+    var btN = 0, btNull = 0, btKinds = {}, btMismatch = 0, btEdge = 0,
+      btLabel = 0, btReason = 0, btDaeBonus = 0;
+    for (var ti2 = 0; ti2 < TALISMANS.length; ti2++) {
+      for (var mi2 = 0; mi2 < M5.length; mi2++) {
+        for (var di2 = 0; di2 < 60; di2++) {
+          var tp2 = { 일간: STEMS[di2 % 10], 일지: BRANCHES[di2 % 12] };
+          var r2 = blessingTier(TALISMANS[ti2].id, { 일간: M5[mi2] }, tp2);
+          btN++;
+          if (!r2) { btNull++; continue; }
+          btKinds[r2.finalTier] = (btKinds[r2.finalTier] || 0) + 1;
+          if (r2.tier !== r2.finalTier) btMismatch++;
+          if (TIER_ORDER.indexOf(r2.finalTier) < 0) btMismatch++;
+          if (r2.bonusApplied) {
+            var bi2 = TIER_ORDER.indexOf(r2.baseTier), fi2 = TIER_ORDER.indexOf(r2.finalTier);
+            if (fi2 !== bi2 + 1) btEdge++;              // 승급은 정확히 1단
+            if (r2.baseTier === '大') btDaeBonus++;      // 大는 승급 없음(codex ㉮4)
+          }
+          if (r2.label !== TIER_LABEL[r2.finalTier]) btLabel++;
+          if (!r2.이유 || r2.이유.length < 10) btReason++;
+          // 이유가 최종 등급과 어긋나지 않는가(大 승급인데 '조용히'만 말하면 불일치)
+          if (r2.bonusApplied && r2.이유.indexOf('한 단계') < 0) btReason++;
+        }
+      }
+    }
+    check('가호 전수 조합', btN, 2700);
+    check('가호 null 반환', btNull, 0);
+    check('가호 등급 3종 상호배타·완전', Object.keys(btKinds).sort().join(''), ['小', '中', '大'].sort().join(''));
+    check('가호 tier=finalTier 일치', btMismatch, 0);
+    check('가호 승급 1단 경계', btEdge, 0);
+    check('가호 大 승급 없음', btDaeBonus, 0);
+    check('가호 라벨 불일치', btLabel, 0);
+    check('가호 이유-등급 불일치', btReason, 0);
+    var btDet = JSON.stringify(blessingTier('el_금', { 일간: '기' }, { 일간: '무' })), btOk = true;
+    for (var bz = 0; bz < 200; bz++) {
+      if (JSON.stringify(blessingTier('el_금', { 일간: '기' }, { 일간: '무' })) !== btDet) { btOk = false; break; }
+    }
+    check('가호 결정론 200회', btOk, 'true');
+    check('가호 미존재 부적 null', blessingTier('없음', { 일간: '기' }, { 일간: '무' }), 'null');
+
+    /* ---------- v6-3: 판매 표면 숫자 인과 금지 (스펙 0장 — 이 스펙의 존재 이유) ----------
+     * 구매 전 노출 문구에 "N→M", "+K", 화살표 등 수치 인과가 들어가면
+     * 표시광고법상 효능의 정량 약속으로 읽힌다(레드팀 R1). 문자열 단계에서 차단한다. */
+    var NUM_CAUSE = [
+      /\d+\s*(?:→|->|⇒|=>)\s*\d+/,   // 35→55
+      /[+＋]\s*\d+/,                   // +20
+      /\d+\s*점?\s*(?:상승|증가|오릅|올라)/,
+      /(?:상승|증가)\s*\d+/
+    ];
+    var PROMISE = /(?:좋아집니다|올라갑니다|보장|반드시|틀림없이|확실히)/;
+    var JUSTIFY = /(?:명리학적으로|정통 명리|학문적으로)\s*(?:정확|입증|검증)/;
+    var saleBad = 0, saleChecked = 0;
+    for (var lk in TIER_LABEL) {
+      saleChecked++;
+      for (var ni = 0; ni < NUM_CAUSE.length; ni++) if (NUM_CAUSE[ni].test(TIER_LABEL[lk])) saleBad++;
+      if (PROMISE.test(TIER_LABEL[lk])) saleBad++;
+    }
+    // 2,700 전수 이유 문구 전부 검사
+    for (var ti3 = 0; ti3 < TALISMANS.length; ti3++) {
+      for (var mi3 = 0; mi3 < M5.length; mi3++) {
+        for (var di3 = 0; di3 < 60; di3++) {
+          var r3 = blessingTier(TALISMANS[ti3].id,
+            { 일간: M5[mi3] }, { 일간: STEMS[di3 % 10], 일지: BRANCHES[di3 % 12] });
+          if (!r3) continue;
+          saleChecked++;
+          for (var nj = 0; nj < NUM_CAUSE.length; nj++) if (NUM_CAUSE[nj].test(r3.이유)) saleBad++;
+          if (PROMISE.test(r3.이유)) saleBad++;
+          if (JUSTIFY.test(r3.이유)) saleBad++;
+          if (/\d/.test(r3.이유)) saleBad++;   // 이유 문구에 숫자 자체를 넣지 않는다
+        }
+      }
+    }
+    check('판매 표면 문구 검사 수', saleChecked, 2703);
+    check('판매 표면 숫자 인과·약속형 위반', saleBad, 0);
+
+
+    /* ---------- v6.1: 가호 이유 문구 단어 중복 0 (검수 지적) ---------- */
+    var reasonSet = {}, reasonDupWord = 0, reasonCount = 0;
+    for (var ri = 0; ri < TALISMANS.length; ri++) {
+      for (var rm = 0; rm < M5.length; rm++) {
+        for (var rd = 0; rd < 60; rd++) {
+          var rr = blessingTier(TALISMANS[ri].id, { 일간: M5[rm] },
+            { 일간: STEMS[rd % 10], 일지: BRANCHES[rd % 12] });
+          if (!rr || reasonSet[rr.이유]) continue;
+          reasonSet[rr.이유] = 1;
+          reasonCount++;
+          var ws = rr.이유.replace(/[.,]/g, '').split(/\s+/);
+          var wc = {};
+          for (var wi = 0; wi < ws.length; wi++) {
+            if (ws[wi].length < 2) continue;
+            wc[ws[wi]] = (wc[ws[wi]] || 0) + 1;
+            if (wc[ws[wi]] > 1) { reasonDupWord++; break; }
+          }
+        }
+      }
+    }
+    check('가호 이유 고유 문구 수', reasonCount > 0, 'true');
+    check('가호 이유 단어 중복', reasonDupWord, 0);
+
     if (!quiet && typeof console !== 'undefined') {
       if (failed === 0) console.log('%c[saju self-test] ' + res.length + '건 PASS', 'color:#0a7d33;font-weight:bold');
       else { console.error('[saju self-test] 실패 ' + failed + '건'); if (console.table) console.table(res.filter(function (r) { return r.판정 === 'FAIL'; })); }
@@ -1290,6 +1565,9 @@
     AREA_GOD: AREA_GOD, neededElement: neededElement, elementOfGroup: elementOfGroup,
     AREA_PROSE: AREA_PROSE, areaProse: areaProse, areaGodOf: areaGodOf,
     weekFlow: weekFlow, LUCK: LUCK, luckOf: luckOf,
+    AREA_BAND: AREA_BAND, AREA_INDEX: AREA_INDEX, areaScore: areaScore,
+    TALISMANS: TALISMANS, talismanById: talismanById, talismanElement: talismanElement,
+    TIER_ORDER: TIER_ORDER, TIER_LABEL: TIER_LABEL, blessingTier: blessingTier,
     SCORE_TABLE: SCORE_TABLE, todayScore: todayScore,
     selfTest: selfTest
   };

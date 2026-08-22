@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap">
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
 
@@ -349,6 +349,15 @@
       <p class="oneline" id="talismanLine">—</p>
       <p class="note">오행 대표 카드 — 60갑자 전용 아트는 제작 예정</p>
 
+      <!-- v6 가호 미리보기 (노출군 전용 · 숫자·화살표 금지) -->
+      <div class="blessing" id="blessingBox" hidden>
+        <p class="blessing-head">
+          <span class="blessing-mark" id="blessingMark" aria-hidden="true">大</span>
+          <span class="blessing-title">오늘의 가호 — <span id="blessingLabel">—</span></span>
+        </p>
+        <p class="blessing-why" id="blessingWhy">—</p>
+      </div>
+
       <!-- 진단 -> 처방 연결 -->
       <div class="rx" id="rxBox" hidden>
         <p class="rx-copy" id="rxCopy">—</p>
@@ -366,6 +375,7 @@
         <h3 class="shelf-title">다가오는 중요한 날이 있나요?</h3>
         <div class="shelf-row" id="shelfRow"></div>
         <p class="tiny">목적 부적은 준비 중입니다.</p>
+        <p class="tiny blessing-note" id="blessingNote" hidden>부적을 소장하면 매일, 그날의 가호 점수를 확인할 수 있어요.</p>
       </div>
 
       <button class="btn btn-ghost" id="backToS3">오늘의 흐름 다시 보기</button>
@@ -432,9 +442,9 @@
   </div>
 </div>
 
-<script src="vendor/manseryeok.js?v=5"></script>
-<script src="saju.js?v=5"></script>
-<script src="profile.js?v=5"></script>
-<script src="app.js?v=5"></script>
+<script src="vendor/manseryeok.js?v=6"></script>
+<script src="saju.js?v=6"></script>
+<script src="profile.js?v=6"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>
