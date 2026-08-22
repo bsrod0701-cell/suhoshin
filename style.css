@@ -476,12 +476,19 @@ form{display:flex;flex-direction:column;gap:8px}
   flex:1;overflow-y:auto;scroll-snap-type:y mandatory;
   -webkit-overflow-scrolling:touch;scrollbar-width:none;
   text-align:center;position:relative;z-index:2;
+  /* 스냅 기준선을 중앙띠(top:80px, 높이40)에 맞춘다.
+   * scroll-padding이 없으면 브라우저는 스크롤포트 '위쪽'을 기준으로 스냅해
+   * 첫 항목이 중앙까지 내려오지 못한다(1월·1일 선택 불가 결함). */
+  scroll-padding-top:80px;
+  scroll-padding-bottom:80px;
 }
 .wheel::-webkit-scrollbar{display:none}
 .wheel:focus-visible{outline:2px solid var(--cinnabar);outline-offset:-2px;border-radius:10px}
-.wheel-pad{height:80px}          /* (200 - 40) / 2 = 80 : 가운데 정렬용 */
+/* 첫/끝 항목이 중앙띠까지 스크롤될 수 있게 하는 스페이서.
+ * 높이 = (컨테이너 200 - 항목 40) / 2 = 80. 스냅 대상에서 제외한다. */
+.wheel-pad{height:80px;scroll-snap-align:none}
 .wheel-item{
-  height:40px;line-height:40px;scroll-snap-align:start;
+  height:40px;line-height:40px;scroll-snap-align:center;
   font-size:16px;color:var(--ink-soft);cursor:pointer;
   transition:color .12s ease,font-weight .12s ease;
 }

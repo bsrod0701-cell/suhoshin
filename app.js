@@ -1311,7 +1311,34 @@
    * ======================================================= */
 
   var pickState = { y: 1990, m: 1, d: 1 };
-  var ITEM_H = 40;   // .wheel-item 높이(css와 동기)
+
+  /* 휠 기하 (style.css와 반드시 같은 값이어야 한다)
+   *   .wheels        height     = WHEEL_H
+   *   .wheel-item    height     = ITEM_H
+   *   .wheel-pad     height     = PAD_H = (WHEEL_H - ITEM_H) / 2
+   *   .wheel-mask    top        = PAD_H
+   * 항목 i를 중앙띠에 놓는 스크롤 위치는 scrollTop = i * ITEM_H 이다
+   * (콘텐츠상 항목 위치 PAD_H + i*ITEM_H 에서 중앙띠 시작 PAD_H 를 뺀 값).
+   * i=0 이면 0, i=마지막이면 (n-1)*ITEM_H 이고, 최대 스크롤도 (n-1)*ITEM_H 이므로
+   * 양끝 항목이 모두 도달 가능하다. CSS는 scroll-snap-align:center +
+   * scroll-padding 80px 로 이 좌표계와 일치시킨다(start로 두면 80px 어긋나
+   * 첫 항목이 중앙에 못 와서 1월·1일이 선택 불가해진다 — 2026-08-22 실기기 결함). */
+  var WHEEL_H = 200;
+  var ITEM_H = 40;
+  var PAD_H = (WHEEL_H - ITEM_H) / 2;
+
+  /** 항목 인덱스 -> 중앙 정렬 scrollTop */
+  function centerTopFor(index) { return index * ITEM_H; }
+  /** 항목 n개일 때 최대 스크롤 위치 */
+  function maxScrollFor(count) { return Math.max(0, (count - 1) * ITEM_H); }
+
+  /* 휠 기하를 테스트에 노출한다 — DOM 테스트가 스크롤 좌표를 기하학적으로 검증한다
+   * (클릭 우회로는 2026-08-22 실기기 결함을 못 잡았다). 상수 정의 뒤에 할당해야
+   * 값이 확정된다(win.SMOKE 리터럴에 넣으면 호이스팅 때문에 undefined가 된다). */
+  win.SMOKE.wheel = {
+    WHEEL_H: WHEEL_H, ITEM_H: ITEM_H, PAD_H: PAD_H,
+    centerTopFor: centerTopFor, maxScrollFor: maxScrollFor
+  };
 
   function buildWheel(el, values, current, onPick) {
     el.innerHTML = '';
@@ -1346,7 +1373,7 @@
     var items = el.querySelectorAll('.wheel-item');
     for (var i = 0; i < items.length; i++) {
       if (items[i].dataset.value === String(value)) {
-        var top = i * ITEM_H;
+        var top = centerTopFor(i);
         if (instant || reduceMotion) el.scrollTop = top;
         else if (el.scrollTo) el.scrollTo({ top: top, behavior: 'smooth' });
         else el.scrollTop = top;
@@ -1377,7 +1404,7 @@
         if (idx > vals.length - 1) idx = vals.length - 1;
         var v = vals[idx];
         if (v === undefined) return;
-        el.scrollTop = idx * ITEM_H;   // 스냅
+        el.scrollTop = centerTopFor(idx);   // 스냅(중앙 정렬 좌표)
         markSelected(el, v.value);
         onPick(v.value);
       }, 90);
