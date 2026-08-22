@@ -2467,14 +2467,170 @@
     renderS2(v);
   });
 
+  /* =========================================================
+   * v7.2 — S2 저장 / 공유 실동작 (목업 alert 제거)
+   *
+   * 벤치마크 공통 문법상 "결과=저장/공유 이미지"가 1급 CTA인데,
+   * 목업 자백 alert가 뜨면 스모크에서 신뢰가 깨진다. 실제로 동작시킨다.
+   *  · 저장: 카드 이미지 + 수호신명 + 간지를 canvas로 합성해 PNG 다운로드
+   *          (assets는 same-origin이라 canvas 오염 없음)
+   *  · 공유: navigator.share → 미지원 시 클립보드 복사
+   *  · 결과 알림은 alert이 아니라 캡션 톤 토스트
+   *  · 파일명은 ASCII 고정, 생년월일 등 개인정보는 파일명·공유문구에 넣지 않는다
+   * ======================================================= */
+
+  var SHARE_URL = 'https://bsrod0701-cell.github.io/suhoshin/';
+  var SAVE_FILENAME = 'guardian_card.png';   // ASCII 고정(한글 파일명 인코딩 회피)
+
+  var toastTimer = null;
+  /** 캡션 톤 토스트. alert을 쓰지 않는다. */
+  function showToast(msg) {
+    var el = $('s2Toast');
+    if (!el) return;
+    el.textContent = msg;
+    el.hidden = false;
+    if (toastTimer) win.clearTimeout(toastTimer);
+    toastTimer = win.setTimeout(function () { el.hidden = true; }, 2600);
+  }
+
+  /** 카드 위에 얹을 문구 — 개인정보(생년월일)는 넣지 않는다. */
+  function cardCaption() {
+    var g = state.guardian;
+    if (!g) return null;
+    return {
+      name: OHAENG_ATTR[g.오행].수식 + ' ' + g.띠,
+      sub: g.일주_한글 + '(' + g.일주_한자 + ') · ' + g.오행 + OHAENG_ATTR[g.오행].한자
+    };
+  }
+
+  /** 수호신 카드를 canvas로 합성한다. 성공 시 blob을 콜백으로 넘긴다. */
+  function composeCard(cb) {
+    var g = state.guardian;
+    if (!g || !doc.createElement) { cb(null); return; }
+    var cap = cardCaption();
+    var src = CARD_FILE[g.오행];
+
+    var img = new win.Image();
+    img.onload = function () {
+      try {
+        var W = img.naturalWidth || 675, H = img.naturalHeight || 1200;
+        var cv = doc.createElement('canvas');
+        cv.width = W; cv.height = H;
+        var cx = cv.getContext('2d');
+        if (!cx) { cb(null); return; }
+
+        cx.drawImage(img, 0, 0, W, H);
+
+        /* 하단에 먹색 띠를 깔고 그 위에 글자를 올린다(카드 아트를 가리지 않게 최소 높이) */
+        var band = Math.round(H * 0.18);
+        var grad = cx.createLinearGradient(0, H - band, 0, H);
+        grad.addColorStop(0, 'rgba(19,16,9,0)');
+        grad.addColorStop(0.35, 'rgba(19,16,9,0.82)');
+        grad.addColorStop(1, 'rgba(19,16,9,0.95)');
+        cx.fillStyle = grad;
+        cx.fillRect(0, H - band, W, band);
+
+        cx.textAlign = 'center';
+        cx.fillStyle = '#F0E7D3';
+        cx.font = '700 ' + Math.round(W * 0.085) + 'px "Gowun Batang", serif';
+        cx.fillText(cap.name, W / 2, H - Math.round(band * 0.52));
+
+        cx.fillStyle = '#C9A227';
+        cx.font = '400 ' + Math.round(W * 0.048) + 'px sans-serif';
+        cx.fillText(cap.sub, W / 2, H - Math.round(band * 0.22));
+
+        if (cv.toBlob) {
+          cv.toBlob(function (blob) { cb(blob); }, 'image/png');
+        } else {
+          cb(null);
+        }
+      } catch (e) {
+        cb(null);   // 합성 실패 시 원본 다운로드로 폴백
+      }
+    };
+    img.onerror = function () { cb(null); };
+    img.src = src;
+  }
+
+  /** blob(또는 원본 경로)을 <a download>로 내려받는다. */
+  function triggerDownload(blobOrUrl) {
+    var a = doc.createElement('a');
+    var isBlob = blobOrUrl && typeof blobOrUrl !== 'string';
+    var url = isBlob ? win.URL.createObjectURL(blobOrUrl) : blobOrUrl;
+    a.href = url;
+    a.download = SAVE_FILENAME;
+    if (doc.body && doc.body.appendChild) doc.body.appendChild(a);
+    a.click();
+    if (doc.body && doc.body.removeChild) {
+      try { doc.body.removeChild(a); } catch (e) { /* 무시 */ }
+    }
+    if (isBlob && win.URL.revokeObjectURL) {
+      win.setTimeout(function () { win.URL.revokeObjectURL(url); }, 1000);
+    }
+    return true;
+  }
+
+  /** 공유 문구 — 생년월일 등 개인정보를 넣지 않는다. */
+  function shareText() {
+    var cap = cardCaption();
+    return {
+      title: '내 수호신',
+      text: cap ? (cap.name + ' — 내 수호신을 찾아보세요') : '내 수호신을 찾아보세요',
+      url: SHARE_URL
+    };
+  }
+
   // S2
   $('btnSave').addEventListener('click', function () {
-    track('save_clicked', { screen: 's2', card_id: state.guardian ? state.guardian.카드ID : null });
-    win.alert('저장되었습니다. (목업 — 실제 파일은 저장되지 않습니다)');
+    /* 계측 정의 무변경 — 기존 save_clicked를 그대로 쓴다(파라미터만 결과 표시 추가) */
+    var cardId = state.guardian ? state.guardian.카드ID : null;
+    composeCard(function (blob) {
+      var mode = blob ? 'composed' : 'original';
+      try {
+        triggerDownload(blob || (state.guardian ? CARD_FILE[state.guardian.오행] : null));
+        showToast('이미지를 저장했어요');
+      } catch (e) {
+        mode = 'failed';
+        showToast('저장하지 못했어요. 잠시 후 다시 시도해 주세요');
+      }
+      track('save_clicked', { screen: 's2', card_id: cardId, mode: mode });
+    });
   });
+
   $('btnShare').addEventListener('click', function () {
-    track('share_clicked', { screen: 's2', card_id: state.guardian ? state.guardian.카드ID : null });
-    win.alert('공유 링크가 준비되었습니다. (목업 — 실제 공유는 동작하지 않습니다)');
+    var cardId = state.guardian ? state.guardian.카드ID : null;
+    var data = shareText();
+    var done = function (mode) {
+      track('share_clicked', { screen: 's2', card_id: cardId, mode: mode });
+    };
+
+    if (win.navigator && typeof win.navigator.share === 'function') {
+      try {
+        var p = win.navigator.share(data);
+        if (p && p.then) {
+          p.then(function () { done('native'); },
+            function () { done('cancelled'); });   // 사용자가 취소해도 alert 없음
+        } else {
+          done('native');
+        }
+        return;
+      } catch (e) { /* 폴백으로 진행 */ }
+    }
+
+    // 폴백 — 클립보드 복사(alert 금지)
+    var link = data.text + ' ' + data.url;
+    if (win.navigator && win.navigator.clipboard && win.navigator.clipboard.writeText) {
+      win.navigator.clipboard.writeText(link).then(function () {
+        showToast('링크를 복사했어요');
+        done('clipboard');
+      }, function () {
+        showToast('링크 복사를 지원하지 않는 환경이에요');
+        done('unsupported');
+      });
+    } else {
+      showToast('링크 복사를 지원하지 않는 환경이에요');
+      done('unsupported');
+    }
   });
 
   // S3 — "오늘 채울 기운" 부적 CTA (재구매 엔진 계측)
