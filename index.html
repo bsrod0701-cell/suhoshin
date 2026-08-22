@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap">
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 
@@ -75,6 +75,104 @@
     </div>
   </section>
 
+  <!-- ===== SH 홈 허브 (v5 — 완주 후·재방문 랜딩) ===== -->
+  <section class="screen" id="sh">
+    <div class="wrap wrap-home">
+      <div class="home-head">
+        <p class="brand">내 수호신</p>
+        <p class="home-owner"><span id="homeOwner">—</span> 님</p>
+      </div>
+
+      <!-- 1. 오늘 점수 요약 -->
+      <button class="home-score" id="homeScoreBox" type="button">
+        <span class="home-score-left">
+          <span class="home-score-num" id="homeScore">—</span>
+          <span class="home-score-unit">점</span>
+        </span>
+        <span class="home-score-right">
+          <span class="home-ganji" id="homeGanji">—</span>
+          <span class="home-line" id="homeLine">—</span>
+        </span>
+        <span class="home-seal" id="homeSeal" aria-hidden="true">吉</span>
+      </button>
+
+      <!-- 2. 내 수호신 미니 카드 -->
+      <button class="home-guard" id="homeGuardBox" type="button">
+        <span class="home-guard-art"><img id="homeGuardImg" alt="" decoding="async"></span>
+        <span class="home-guard-body">
+          <span class="home-guard-eyebrow">내 수호신</span>
+          <span class="home-guard-name" id="homeGuardName">—</span>
+          <span class="home-guard-sub" id="homeGuardSub">—</span>
+        </span>
+      </button>
+
+      <!-- 3. 세부 운세 4카드 -->
+      <h3 class="sec-title">오늘의 세부 운세</h3>
+      <div class="area-grid" id="areaGrid"></div>
+
+      <!-- 4. 이번 주 흐름 -->
+      <h3 class="sec-title">이번 주 흐름</h3>
+      <div class="week-wrap">
+        <div id="weekChart"></div>
+        <p class="week-tip" id="weekTip" hidden>—</p>
+      </div>
+
+      <!-- 5. 오늘 채울 기운 + 행운 -->
+      <h3 class="sec-title">오늘 채울 기운</h3>
+      <div class="need-card" id="homeNeedCard">
+        <div class="need-art"><img id="homeNeedImg" alt="" decoding="async"></div>
+        <div class="need-body">
+          <p class="need-eyebrow">오늘의 부적</p>
+          <p class="need-el" id="homeNeedEl">—</p>
+          <p class="need-why" id="homeNeedWhy">—</p>
+          <button class="btn btn-cta sm" id="homeNeedCta">이 부적 보기</button>
+        </div>
+      </div>
+
+      <div class="luck-card" id="luckCard">
+        <p class="luck-title">오늘의 행운</p>
+        <div class="luck-grid">
+          <span class="luck-item"><i>방위</i><b id="luckDir">—</b></span>
+          <span class="luck-item"><i>색</i><b id="luckColor">—</b></span>
+          <span class="luck-item"><i>숫자</i><b id="luckNum">—</b></span>
+          <span class="luck-item"><i>시간대</i><b id="luckTime">—</b></span>
+        </div>
+        <p class="luck-note" id="luckNote">—</p>
+        <p class="tiny">방위·색·숫자는 오행 배속과 하도낙서 수리 통설을 옮긴 것입니다.</p>
+      </div>
+
+      <!-- 6. 부적 상점 진열 -->
+      <h3 class="sec-title">부적 진열대</h3>
+      <div class="shop-row" id="shopRow"></div>
+      <div class="shelf-row" id="shopPurpose"></div>
+
+      <p class="tiny center">재미와 마음의 위안을 위한 콘텐츠입니다.</p>
+    </div>
+  </section>
+
+  <!-- ===== SD 영역 상세 (4영역 공용 템플릿) ===== -->
+  <section class="screen" id="sd">
+    <div class="wrap">
+      <button class="btn-home" id="sdHome" type="button">홈</button>
+
+      <p class="eyebrow" id="sdEyebrow">—</p>
+      <h2 class="head" id="sdTitle">—</h2>
+
+      <div class="gauge" id="sdGauge"></div>
+
+      <p class="prose" id="sdProse">—</p>
+      <p class="tiny" id="sdRelation">—</p>
+
+      <div class="rx" id="sdRx">
+        <p class="rx-copy" id="sdRxCopy">—</p>
+        <p class="rx-target"><span id="sdRxTarget">—</span> 준비 중</p>
+      </div>
+      <button class="btn btn-cta" id="sdCta">—</button>
+
+      <button class="btn btn-ghost" id="sdBack">돌아가기</button>
+    </div>
+  </section>
+
   <!-- ===== S1 생년월일 입력 ===== -->
   <section class="screen" id="s1">
     <div class="wrap">
@@ -112,6 +210,7 @@
   <!-- ===== S2 수호신 공개 (정체성) ===== -->
   <section class="screen" id="s2">
     <div class="wrap">
+      <button class="btn-home" id="s2Home" type="button" hidden>홈</button>
       <p class="eyebrow">당신의 수호신</p>
 
       <div class="cardbox" id="revealBox">
@@ -141,6 +240,7 @@
   <!-- ===== SA 사주 분석 (신설 — S2 수호신 다음) ===== -->
   <section class="screen" id="sa">
     <div class="wrap">
+      <button class="btn-home" id="saHome" type="button" hidden>홈</button>
       <p class="eyebrow"><span id="saOwner">—</span> 님의 사주</p>
 
       <!-- 사주 요약 -->
@@ -190,6 +290,7 @@
   <!-- ===== S3 오늘의 흐름 (진단 · 신설) ===== -->
   <section class="screen" id="s3">
     <div class="wrap">
+      <button class="btn-home" id="s3Home" type="button" hidden>홈</button>
       <p class="eyebrow"><span id="flowDate">—</span> 오늘의 흐름</p>
 
       <!-- 시그니처: 한지가 펼쳐지고 인장이 찍히는 점수 공개 -->
@@ -237,6 +338,7 @@
   <!-- ===== S4 오늘의 부적 + 목적 부적 (처방 · 과금) ===== -->
   <section class="screen" id="s4">
     <div class="wrap">
+      <button class="btn-home" id="s4Home" type="button" hidden>홈</button>
       <p class="eyebrow" id="todayLabel">오늘의 부적</p>
 
       <div class="cardbox small">
@@ -330,9 +432,9 @@
   </div>
 </div>
 
-<script src="vendor/manseryeok.js?v=4"></script>
-<script src="saju.js?v=4"></script>
-<script src="profile.js?v=4"></script>
-<script src="app.js?v=4"></script>
+<script src="vendor/manseryeok.js?v=5"></script>
+<script src="saju.js?v=5"></script>
+<script src="profile.js?v=5"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

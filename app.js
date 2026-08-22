@@ -233,19 +233,35 @@
     var out = {};
     var i, area;
 
+    /* 영역별 '왜 이 등급인지'의 사유를 함께 기록한다(v5.1).
+     * 화면이 거짓 인과를 말하지 않게 하기 위한 것 — 반환 형태는
+     * 기존과 동일한 {영역:등급} 객체를 유지하고, 사유는 out.__reason에 숨겨 붙인다
+     * (기존 호출부·테스트가 그대로 동작해야 한다).
+     *   'r1'      : 담당 영역이 R1(천간 관계)이라 정해짐
+     *   'r2'      : 담당 영역이 R2(지지 관계)라 정해짐
+     *   'gwan'    : R1=관성이라 '일'이 주의로 놓임
+     *   'rotate'  : 주의가 0개라 무담당 중 결정론 순환으로 강등됨
+     *   'neutral' : 무담당 기본값(보통)
+     */
+    var why = {};
+
     // 3. 기본값 = 보통(무담당)
-    for (i = 0; i < AREA_ORDER.length; i++) out[AREA_ORDER[i]] = '보통';
+    for (i = 0; i < AREA_ORDER.length; i++) { out[AREA_ORDER[i]] = '보통'; why[AREA_ORDER[i]] = 'neutral'; }
 
     // 2. R2 담당 영역 = 좋음 (일 포함) — 먼저 깔고 R1으로 덮어써 "R1 우선"을 보장
     for (i = 0; i < AREA_ORDER.length; i++) {
       area = AREA_ORDER[i];
-      if (AREA_TYPE[area] === r2) out[area] = '좋음';
+      if (AREA_TYPE[area] === r2) { out[area] = '좋음'; why[area] = 'r2'; }
     }
 
     // 1. R1 담당 영역 = 좋음, 단 R1=관성이면 일=주의
     for (i = 0; i < AREA_ORDER.length; i++) {
       area = AREA_ORDER[i];
-      if (AREA_TYPE[area] === r1) out[area] = (area === '일' && r1 === '관성') ? '주의' : '좋음';
+      if (AREA_TYPE[area] === r1) {
+        var isGwan = (area === '일' && r1 === '관성');
+        out[area] = isGwan ? '주의' : '좋음';
+        why[area] = isGwan ? 'gwan' : 'r1';
+      }
     }
 
     // 4. 주의가 0개면 무담당(보통) 영역 중 결정론 순환으로 1개 강등
@@ -261,8 +277,13 @@
       if (cand.length) {
         var pick = cand[mod(todayNo + myNo, cand.length)];
         out[pick] = '주의';
+        why[pick] = 'rotate';
       }
     }
+    // 열거되지 않게 숨겨 붙인다 — Object.keys(areas).length === 4 를 보는 기존 검증 보존
+    try {
+      Object.defineProperty(out, '__reason', { value: why, enumerable: false });
+    } catch (e) { /* 구형 환경: 사유 없이도 동작해야 한다 */ }
     return out;
   }
 
@@ -965,7 +986,8 @@
   var doc = win.document;
   var $ = function (id) { return doc.getElementById(id); };
   var state = { ilju: null, guardian: null, talisman: null, diag: null, ctaShown: false,
-    profile: null, pillars: null, strength: null, need: null, prose: null };
+    profile: null, pillars: null, strength: null, need: null, prose: null,
+    week: null, areaOpen: null };
   var reached = {};
 
   function show(screenId) {
@@ -986,7 +1008,8 @@
   } catch (e) { reduceMotion = false; }
 
   /* ---- S2 렌더: 수호신 공개 ---- */
-  function renderS2(birth) {
+  /** S2 화면 내용만 채운다(화면 전환·계측 없음). 홈 랜딩에서도 재사용. */
+  function fillS2(birth) {
     var g = read(birth);
     state.guardian = g;
 
@@ -1003,6 +1026,20 @@
       li.textContent = t[i];
       ul.appendChild(li);
     }
+    return g;
+  }
+
+  /** 홈 랜딩용 — 수호신 상태만 준비하고 S2는 띄우지 않는다(s2_reached 미발생). */
+  function renderS2Silent(birth) {
+    var g = fillS2(birth);
+    // 홈에서 S2로 들어갔을 때 카드가 뒤집힌 상태로 보이게 준비만 해 둔다
+    $('cardFlip').classList.add('flipped');
+    $('s2Detail').classList.add('shown');
+    return g;
+  }
+
+  function renderS2(birth) {
+    var g = fillS2(birth);
 
     show('s2');
 
@@ -1210,6 +1247,9 @@
 
     if (!reached.s4) {
       reached.s4 = true;
+      /* 첫 완주 지점. s4_reached(기존 완주 이벤트)는 그대로 두고,
+       * 홈 랜딩 자격 표식만 별도로 남긴다 — 기존 지표 정의 무변경. */
+      markFirstRunDone();
       track('s4_reached', {
         today_ilju: t.일주_한글,
         today_ohaeng: t.오행,
@@ -1344,11 +1384,20 @@
     // C-⑤ 생년월일 원문은 계측에 넣지 않는다 — 일주 결과값만
     var g = read(iso);
     store.set(LS.ilju, g.일주_한글);
+    var done = isFirstRunDone();
     track('profile_selected', {
       ilju: g.일주_한글, ohaeng: g.오행,
-      calendar: p.calendar, has_hour: !!p.hourBranch, has_gender: !!p.gender
+      calendar: p.calendar, has_hour: !!p.hourBranch, has_gender: !!p.gender,
+      landing: done ? 'home' : 'linear'
     });
-    renderS2(iso);
+    /* ★ 완주 정의 보존: 첫 완주를 마치지 않은 사용자는 반드시 기존 선형을 탄다.
+     * 완주 후·재방문만 홈으로 랜딩한다(스펙 1장). */
+    if (done) {
+      renderS2Silent(iso);   // 수호신 상태만 세팅하고 화면은 홈으로
+      renderHome();
+    } else {
+      renderS2(iso);
+    }
   }
 
   /* =========================================================
@@ -1768,6 +1817,372 @@
     return wrap;
   }
 
+
+  /* =========================================================
+   * 11. v5 — 홈 허브(SH) · 영역 상세(SD) · 주간 그래프 · 행운
+   *
+   * ★ 완주 정의 보존(스펙 1장·주의 1):
+   *   신규 사용자의 첫 완주는 기존 선형(S0→S2→SA→S3→S4)을 그대로 탄다.
+   *   홈 랜딩은 "첫 완주를 마친 뒤"와 "재방문"에만 적용한다.
+   *   완주 여부는 세션 메모리(reached)가 아니라 localStorage에 남겨야
+   *   재방문에서도 유지된다.
+   * ======================================================= */
+
+  var LS_DONE = 'gs_first_run_done';   // 첫 완주 표식(홈 랜딩 자격)
+
+  function isFirstRunDone() { return store.get(LS_DONE) === '1'; }
+  function markFirstRunDone() {
+    if (isFirstRunDone()) return;
+    store.set(LS_DONE, '1');
+    track('first_run_completed', {});   // 기존 지표 정의 무변경 — 이벤트 추가만
+  }
+
+  /* ---- 질문형 카피 (자체 작성 — 참고앱 문구 복제 금지) ---- */
+  var AREA_QUESTION = {
+    '재물': '오늘 돈의 흐름은 어느 쪽일까요?',
+    '애정': '오늘 마음은 어디로 향할까요?',
+    '일': '오늘 일은 어떻게 풀릴까요?',
+    '건강': '오늘 몸은 어떤 신호를 보낼까요?'
+  };
+  var AREA_ICON_MARK = { '좋음': '●', '보통': '◐', '주의': '○' };
+  // 영역 -> 부적 연결 (v4 결정 유지: 건강은 오늘 채울 기운 부적)
+  var AREA_TALISMAN = {
+    '재물': '재물 부적', '애정': '연애 부적', '일': '합격 부적', '건강': null
+  };
+
+  /** 오늘 진단을 한 번만 계산해 홈·상세가 공유한다(결정론이라 값은 동일) */
+  function todayContext() {
+    if (!state.guardian) return null;
+    var t = read(today);
+    var dg = diagnose(state.guardian, t);
+    var SJx = getSaju();
+    var need = (SJx && state.guardian.일간)
+      ? SJx.neededElement(state.guardian.일간, t.일간, dg.caution)
+      : null;
+    return { today: t, diag: dg, need: need, saju: SJx };
+  }
+
+  /* =========================================================
+   * 11-1. 홈 허브 렌더
+   * ======================================================= */
+
+  function renderHome() {
+    var ctx = todayContext();
+    if (!ctx || !ctx.saju) return;
+    var SJx = ctx.saju, t = ctx.today, dg = ctx.diag;
+
+    state.talisman = t;
+    state.diag = dg;
+    state.need = ctx.need;
+
+    $('homeOwner').textContent = state.profile ? state.profile.name : '';
+
+    // 1. 오늘 점수 요약
+    var grade = SJx.scoreGrade(dg.score);
+    $('homeScore').textContent = String(dg.score);
+    $('homeSeal').textContent = SJx.GRADE_SEAL[grade];
+    $('homeGanji').textContent = today.replace(/-/g, '. ') + ' · ' + t.일주_한글;
+    $('homeLine').textContent = summaryFor(dg, t.갑자순번, state.guardian.갑자순번);
+
+    // 2. 수호신 미니 카드
+    var g = state.guardian;
+    $('homeGuardImg').src = CARD_FILE[g.오행];
+    $('homeGuardImg').alt = g.오행 + ' 기운의 수호신 카드';
+    $('homeGuardName').textContent = OHAENG_ATTR[g.오행].수식 + ' ' + g.띠;
+    $('homeGuardSub').textContent = g.일주_한글 + '(' + g.일주_한자 + ') · 60갑자 ' + g.갑자순번 + '번';
+
+    // 3. 세부 운세 4카드
+    var grid = $('areaGrid');
+    grid.innerHTML = '';
+    for (var i = 0; i < AREA_ORDER.length; i++) {
+      (function (area) {
+        var lv = dg.areas[area];
+        var card = doc.createElement('button');
+        card.type = 'button';
+        card.className = 'area-card area-' + (lv === '좋음' ? 'good' : lv === '보통' ? 'mid' : 'warn');
+
+        var head = doc.createElement('span');
+        head.className = 'area-card-head';
+        var mk = doc.createElement('span');
+        mk.className = 'area-mark';
+        mk.setAttribute('aria-hidden', 'true');
+        mk.textContent = AREA_ICON_MARK[lv];
+        var nm = doc.createElement('span');
+        nm.className = 'area-card-name';
+        nm.textContent = area + '운';
+        var lvEl = doc.createElement('span');
+        lvEl.className = 'area-level';
+        lvEl.textContent = lv;
+        head.appendChild(mk); head.appendChild(nm); head.appendChild(lvEl);
+
+        var q = doc.createElement('span');
+        q.className = 'area-card-q';
+        q.textContent = AREA_QUESTION[area];
+
+        card.appendChild(head);
+        card.appendChild(q);
+        card.addEventListener('click', function () { renderAreaDetail(area); });
+        grid.appendChild(card);
+      })(AREA_ORDER[i]);
+    }
+
+    // 4. 이번 주 흐름
+    renderWeek(SJx);
+
+    // 5. 오늘 채울 기운 + 행운
+    if (ctx.need) {
+      $('homeNeedImg').src = CARD_FILE[ctx.need.오행];
+      $('homeNeedImg').alt = ctx.need.오행 + ' 기운의 부적';
+      $('homeNeedEl').textContent = ctx.need.오행 + SJx.EL_HANJA[ctx.need.오행] + ' 기운의 부적';
+      $('homeNeedWhy').textContent = ctx.need.이유;
+      $('homeNeedCard').hidden = false;
+
+      var lk = SJx.luckOf(ctx.need.오행);
+      if (lk) {
+        $('luckDir').textContent = lk.방위;
+        $('luckColor').textContent = lk.색;
+        $('luckNum').textContent = lk.숫자표기;
+        $('luckTime').textContent = lk.시간대;
+        $('luckNote').textContent = lk.한줄;
+        $('luckCard').hidden = false;
+      }
+    } else {
+      $('homeNeedCard').hidden = true;
+      $('luckCard').hidden = true;
+    }
+
+    // 6. 부적 진열대 — 오행 5종 + 목적 4종
+    var shop = $('shopRow');
+    shop.innerHTML = '';
+    for (var e = 0; e < SJx.EL_ORDER.length; e++) {
+      (function (el) {
+        var it = doc.createElement('button');
+        it.type = 'button';
+        it.className = 'shop-item' + (ctx.need && ctx.need.오행 === el ? ' is-today' : '');
+        var im = doc.createElement('img');
+        im.src = CARD_FILE[el];
+        im.alt = el + ' 기운의 부적';
+        im.setAttribute('decoding', 'async');
+        var cap = doc.createElement('span');
+        cap.className = 'shop-cap';
+        cap.textContent = el + SJx.EL_HANJA[el];
+        it.appendChild(im); it.appendChild(cap);
+        it.addEventListener('click', function () {
+          track('shop_item_clicked', { element: el, today: ctx.need && ctx.need.오행 === el });
+          renderS4();
+        });
+        shop.appendChild(it);
+      })(SJx.EL_ORDER[e]);
+    }
+
+    var purpose = $('shopPurpose');
+    purpose.innerHTML = '';
+    for (var pi = 0; pi < PURPOSE_SHELF.length; pi++) {
+      (function (item) {
+        var d = doc.createElement('button');
+        d.type = 'button';
+        d.className = 'shelf-item';
+        var sp = doc.createElement('span');
+        sp.className = 'shelf-icon';
+        sp.textContent = item.icon;
+        d.appendChild(sp);
+        d.appendChild(doc.createTextNode(item.label));
+        d.addEventListener('click', function () {
+          track('shop_purpose_clicked', { purpose: item.label });
+          renderS4();
+        });
+        purpose.appendChild(d);
+      })(PURPOSE_SHELF[pi]);
+    }
+
+    show('sh');
+    // 홈에 들어오면 다른 화면의 홈 버튼을 노출한다
+    var hb = ['s2Home', 'saHome', 's3Home', 's4Home'];
+    for (var h = 0; h < hb.length; h++) $(hb[h]).hidden = false;
+
+    if (!reached.sh) {
+      reached.sh = true;
+      track('home_reached', { score: dg.score, grade: grade, need: ctx.need ? ctx.need.오행 : null });
+    }
+  }
+
+  /* =========================================================
+   * 11-2. 이번 주 흐름 — 인라인 SVG 미니 그래프(라이브러리 0)
+   * ======================================================= */
+
+  function renderWeek(SJx) {
+    var host = $('weekChart');
+    host.innerHTML = '';
+    var series = SJx.weekFlow(state.guardian, read, today, addDaysISO, 7);
+    state.week = series;
+
+    var W = 300, H = 110, padX = 18, padY = 14;
+    var lo = SJx.SCORE_FLOOR, hi = SJx.SCORE_CEIL;
+    var innerW = W - padX * 2, innerH = H - padY * 2 - 16;
+    var stepX = innerW / (series.length - 1);
+    var yOf = function (v) { return padY + innerH - ((v - lo) / (hi - lo)) * innerH; };
+
+    var svg = svgEl('svg', {
+      'class': 'week-svg', viewBox: '0 0 ' + W + ' ' + H, role: 'img',
+      'aria-label': '이번 주 흐름 — ' + series.map(function (d) {
+        return d.iso.slice(5) + ' ' + d.score + '점';
+      }).join(', ')
+    });
+
+    // 기준선(중앙)
+    svg.appendChild(svgEl('line', {
+      'class': 'week-base', x1: padX, y1: yOf((lo + hi) / 2).toFixed(1),
+      x2: W - padX, y2: yOf((lo + hi) / 2).toFixed(1)
+    }));
+
+    // 꺾은선
+    var pts = series.map(function (d, i) {
+      return (padX + i * stepX).toFixed(1) + ',' + yOf(d.score).toFixed(1);
+    }).join(' ');
+    svg.appendChild(svgEl('polyline', { 'class': 'week-line', points: pts }));
+
+    // 점 + 날짜 + 탭 영역
+    for (var i = 0; i < series.length; i++) {
+      (function (d, idx) {
+        var cx = padX + idx * stepX, cy = yOf(d.score);
+        var dot = svgEl('circle', {
+          'class': 'week-dot' + (d.isToday ? ' is-today' : '') + ' wk-' + d.grade,
+          cx: cx.toFixed(1), cy: cy.toFixed(1), r: d.isToday ? 5.5 : 3.8
+        });
+        svg.appendChild(dot);
+
+        var lab = svgEl('text', {
+          'class': 'week-label' + (d.isToday ? ' is-today' : ''),
+          x: cx.toFixed(1), y: (H - 3).toFixed(1)
+        });
+        lab.textContent = d.isToday ? '오늘' : d.iso.slice(8).replace(/^0/, '') + '일';
+        svg.appendChild(lab);
+
+        // 탭 영역(터치 44px 확보용 투명 사각)
+        var hit = svgEl('rect', {
+          'class': 'week-hit',
+          x: (cx - stepX / 2).toFixed(1), y: 0,
+          width: stepX.toFixed(1), height: H
+        });
+        hit.addEventListener('click', function () {
+          showWeekTip(d);
+        });
+        svg.appendChild(hit);
+      })(series[i], i);
+    }
+
+    host.appendChild(svg);
+    $('weekTip').hidden = true;
+  }
+
+  /** 툴팁은 항상 1개만 열린다(스펙 3장) */
+  function showWeekTip(d) {
+    var tip = $('weekTip');
+    tip.textContent = d.iso.replace(/-/g, '. ') + ' · ' + d.ganji + ' · ' + d.score + '점(' + d.seal + ')';
+    tip.hidden = false;
+    track('week_point_tapped', { offset: d.offset, score: d.score, grade: d.grade });
+  }
+
+  /* =========================================================
+   * 11-3. 영역 상세(SD)
+   * ======================================================= */
+
+  function renderAreaDetail(area) {
+    var ctx = todayContext();
+    if (!ctx || !ctx.saju) return;
+    var SJx = ctx.saju, t = ctx.today, dg = ctx.diag;
+    var lv = dg.areas[area];
+
+    state.areaOpen = area;
+
+    $('sdEyebrow').textContent = today.replace(/-/g, '. ') + ' 오늘의 ' + area + '운';
+    $('sdTitle').textContent = area + '운 · ' + lv;
+
+    // 등급 게이지 3구간 (금색 hairline, 인라인 SVG)
+    renderGauge($('sdGauge'), lv);
+
+    // 영역 프로즈 — 내 일간 × 오늘 천간의 십성
+    var god = SJx.areaGodOf(state.guardian.일간, t.일간);
+    var prose = SJx.areaProse(area, god, t.갑자순번, state.guardian.갑자순번);
+    $('sdProse').textContent = prose || '';
+
+    /* "왜 이 등급" 설명 1줄 — 거짓 인과 금지(v5.1 검수 반영).
+     * 십성 관계가 등급을 정한 것은 '담당 영역'일 때뿐이다. 무담당은 기본값이고,
+     * 주의는 순환 강등일 수 있으므로 사유별로 정직하게 나눠 말한다. */
+    var reason = (dg.areas.__reason && dg.areas.__reason[area]) || 'neutral';
+    var elName = state.guardian.오행;
+    /* 받침 유무에 따라 조사를 고른다(오행 5종: 목/금 받침O, 화/토/수 받침X). */
+    var josa = (elName === '목' || elName === '금') ? '과' : '와';
+    var lvJosa = (lv === '주의') ? '로' : '으로';
+    var relText;
+    if (reason === 'r1' || reason === 'r2' || reason === 'gwan') {
+      // ① 담당 영역 — 십성 관계가 실제로 이 등급을 정했다
+      relText = '오늘의 간지 ' + t.일주_한글 + ' — 당신의 ' + state.guardian.일간
+        + '(' + elName + ')' + josa + ' ' + god + ' 관계라 ' + area + '운이 ' + lv + lvJosa + ' 놓였습니다.';
+    } else if (reason === 'rotate') {
+      // ② 순환 강등 — 크게 흔들리는 곳이 없어 상대적으로 짚은 자리
+      relText = '오늘은 크게 흔들리는 영역이 없는 날입니다. 그중 상대적으로 아껴 둘 곳으로 '
+        + area + '운을 짚었습니다.';
+    } else {
+      // ③ 무담당 기본값 — 오늘 기운이 이 영역을 특별히 건드리지 않는다
+      relText = '오늘의 기운이 ' + area + ' 쪽을 특별히 밀지도 조이지도 않는 날입니다.';
+    }
+    $('sdRelation').textContent = relText;
+
+    // 부적 연결 — 건강은 오늘 채울 기운 부적(v4 결정 유지)
+    var talisman = AREA_TALISMAN[area];
+    var needEl = ctx.need ? ctx.need.오행 : null;
+    if (!talisman && needEl) talisman = needEl + SJx.EL_HANJA[needEl] + ' 기운의 부적';
+
+    /* 처방 카피도 사유에 맞춘다 — 순환 강등을 "헐거워진다"고 단정하지 않는다.
+     * (홈의 간이 용신 카드 문구는 v4 확정분이라 건드리지 않는다) */
+    var rxCopy;
+    if (lv === '주의' && reason === 'rotate') {
+      rxCopy = '오늘 특별히 위태로운 곳은 없지만, ' + area + ' 쪽을 한 번 살펴 두면 좋은 날입니다.';
+    } else if (lv === '주의') {
+      rxCopy = '오늘 ' + area + ' 쪽이 헐거워지기 쉬운 날입니다.';
+    } else {
+      rxCopy = '오늘 ' + area + ' 흐름을 이어 두면 좋은 날입니다.';
+    }
+    $('sdRxCopy').textContent = rxCopy;
+    $('sdRxTarget').textContent = talisman || '부적';
+    $('sdCta').textContent = (talisman || '부적') + ' 보기';
+
+    show('sd');
+
+    track('area_detail_viewed', { area: area, level: lv, god: god, score: dg.score });
+  }
+
+  /** 등급 게이지 — 3구간(주의/보통/좋음) 중 현재 위치 강조 */
+  function renderGauge(host, level) {
+    host.innerHTML = '';
+    var W = 280, H = 34, segW = (W - 4) / 3;
+    var order = ['주의', '보통', '좋음'];
+    /* 색 의미 정합(v5.1 검수): 홈 카드 배지는 주의=주사 빨강인데
+     * 게이지만 항상 금색이면 같은 '주의'가 두 색으로 보인다.
+     * 주의일 때만 주사 계열로 분기하고 좋음·보통은 금색을 유지한다. */
+    var warnCls = (level === '주의') ? ' is-warn' : '';
+    var svg = svgEl('svg', {
+      'class': 'gauge-svg', viewBox: '0 0 ' + W + ' ' + H,
+      role: 'img', 'aria-label': '오늘 등급 ' + level
+    });
+    for (var i = 0; i < order.length; i++) {
+      var on = order[i] === level;
+      svg.appendChild(svgEl('rect', {
+        'class': 'gauge-seg' + (on ? ' is-on' + warnCls : ''),
+        x: (2 + i * segW).toFixed(1), y: 2,
+        width: (segW - 3).toFixed(1), height: (H - 12).toFixed(1), rx: 3
+      }));
+      var tx = svgEl('text', {
+        'class': 'gauge-label' + (on ? ' is-on' + warnCls : ''),
+        x: (2 + i * segW + segW / 2).toFixed(1), y: (H - 2).toFixed(1)
+      });
+      tx.textContent = order[i];
+      svg.appendChild(tx);
+    }
+    host.appendChild(svg);
+  }
+
   /* =========================================================
    * 8. 이벤트 바인딩
    * ======================================================= */
@@ -2033,6 +2448,47 @@
       show('s2');
       $('cardFlip').classList.add('flipped');
       $('s2Detail').classList.add('shown');
+    });
+
+    /* ---- v5 홈 허브 배선 ---- */
+    $('homeScoreBox').addEventListener('click', function () {
+      track('home_to_s3', {});
+      renderS3();
+    });
+    $('homeGuardBox').addEventListener('click', function () {
+      track('home_to_s2', {});
+      show('s2');
+      $('cardFlip').classList.add('flipped');
+      $('s2Detail').classList.add('shown');
+    });
+    $('homeNeedCta').addEventListener('click', function () {
+      track('home_need_clicked', { element: state.need ? state.need.오행 : null });
+      renderS4();
+    });
+
+    // 각 화면 -> 홈 복귀
+    var homeBtns = ['s2Home', 'saHome', 's3Home', 's4Home', 'sdHome'];
+    for (var hi = 0; hi < homeBtns.length; hi++) {
+      (function (id) {
+        $(id).addEventListener('click', function () {
+          track('home_returned', { from: id.replace('Home', '') });
+          renderHome();
+        });
+      })(homeBtns[hi]);
+    }
+
+    // 영역 상세 CTA / 돌아가기
+    $('sdCta').addEventListener('click', function () {
+      track('area_cta_clicked', {
+        area: state.areaOpen,
+        level: state.areaOpen && state.diag ? state.diag.areas[state.areaOpen] : null,
+        arm: arm
+      });
+      renderS4();
+    });
+    $('sdBack').addEventListener('click', function () {
+      track('area_detail_back', { area: state.areaOpen });
+      renderHome();
     });
 
     // 첫 화면 결정: 프로필이 있으면 목록, 없으면 입력 폼으로 바로

@@ -738,3 +738,166 @@ form{display:flex;flex-direction:column;gap:8px}
   .need-card{gap:10px;padding:11px}
   .need-art{width:62px}
 }
+
+/* =========================================================
+ * v5 — 홈 허브(SH) · 영역 상세(SD) · 주간 그래프 · 행운
+ * v4 토큰만 사용(새 토큰 신설 금지). 홈은 허브지만 절제 — 시그니처는 여전히 카드/타일.
+ * ======================================================= */
+
+/* 홈은 세로로 길어 가운데 정렬이 어색하다 — 위에서부터 쌓는다 */
+.wrap-home{justify-content:flex-start;gap:12px}
+
+.home-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.home-owner{margin:0;font-size:13px;color:var(--hanji-dim)}
+.home-owner span{color:var(--hanji);font-weight:700}
+
+/* 1. 오늘 점수 요약 */
+.home-score{
+  position:relative;display:flex;align-items:center;gap:12px;width:100%;
+  font:inherit;text-align:left;cursor:pointer;
+  background:linear-gradient(180deg,#221B12,#1A150E);
+  border:1px solid var(--line-strong);border-radius:14px;
+  padding:14px 15px;min-height:var(--tap);color:var(--hanji);
+}
+.home-score:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.home-score-left{display:flex;align-items:baseline;gap:2px;flex:none}
+.home-score-num{
+  font-family:var(--font-display);font-size:38px;font-weight:700;line-height:1;
+  color:var(--gold);font-variant-numeric:tabular-nums;
+}
+.home-score-unit{font-size:13px;color:var(--hanji-dim)}
+.home-score-right{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.home-ganji{font-size:12px;color:var(--hanji-dim);letter-spacing:.03em}
+.home-line{font-size:13.5px;line-height:1.5;color:var(--hanji)}
+.home-seal{
+  position:absolute;right:12px;top:12px;
+  width:26px;height:26px;display:flex;align-items:center;justify-content:center;
+  background:var(--jusa);color:#FFF6EA;border-radius:3px;
+  box-shadow:inset 0 0 0 1.5px rgba(255,246,234,.85);
+  font-family:var(--font-display);font-size:14px;font-weight:700;
+  transform:rotate(-6deg);
+}
+
+/* 2. 수호신 미니 카드 */
+.home-guard{
+  display:flex;gap:12px;align-items:center;width:100%;
+  font:inherit;text-align:left;cursor:pointer;
+  background:var(--ink-2);border:1px solid var(--line);border-radius:14px;
+  padding:11px 13px;min-height:var(--tap);color:var(--hanji);
+}
+.home-guard:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.home-guard-art{flex:none;width:46px}
+.home-guard-art img{
+  width:100%;aspect-ratio:675/1200;object-fit:cover;border-radius:5px;display:block;
+  box-shadow:0 0 12px rgba(201,162,39,.18);
+}
+.home-guard-body{display:flex;flex-direction:column;gap:2px;min-width:0}
+.home-guard-eyebrow{font-size:11px;letter-spacing:.14em;color:var(--gold);font-weight:700}
+.home-guard-name{font-family:var(--font-display);font-size:16px;font-weight:700}
+.home-guard-sub{font-size:11.5px;color:var(--hanji-dim)}
+
+/* 3. 세부 운세 4카드 (2x2) */
+.area-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.area-card{
+  display:flex;flex-direction:column;gap:6px;width:100%;
+  font:inherit;text-align:left;cursor:pointer;
+  background:var(--ink-2);border:1px solid var(--line);border-radius:12px;
+  padding:12px;min-height:76px;color:var(--hanji);
+}
+.area-card:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.area-card-head{display:flex;align-items:center;gap:6px}
+.area-card-name{font-size:14.5px;font-weight:700}
+.area-card-q{font-size:12px;line-height:1.5;color:var(--hanji-dim)}
+.area-card.area-warn{border-color:rgba(179,64,42,.45)}
+
+/* 4. 이번 주 흐름 */
+.week-wrap{
+  background:var(--ink-2);border:1px solid var(--line);
+  border-radius:12px;padding:10px 8px 6px;
+}
+.week-svg{display:block;width:100%;overflow:visible}
+.week-base{stroke:rgba(201,162,39,.18);stroke-width:1;stroke-dasharray:2 3}
+.week-line{fill:none;stroke:var(--gold);stroke-width:1.6;opacity:.75}
+.week-dot{fill:var(--ink);stroke:var(--gold);stroke-width:1.6}
+.week-dot.is-today{fill:var(--gold);stroke:#FFF6EA;stroke-width:1.4}
+.week-dot.wk-흉{stroke:var(--jusa)}
+.week-hit{fill:transparent;cursor:pointer}
+.week-label{font-size:9.5px;text-anchor:middle;fill:var(--hanji-dim)}
+.week-label.is-today{fill:var(--gold);font-weight:700}
+.week-tip{
+  margin:6px 4px 2px;font-size:12px;color:var(--hanji);
+  background:rgba(201,162,39,.10);border-radius:7px;padding:7px 9px;
+}
+
+/* 5. 오늘의 행운 */
+.luck-card{
+  background:var(--ink-2);border:1px solid var(--line);
+  border-radius:12px;padding:13px 14px;
+}
+.luck-title{
+  margin:0 0 8px;font-family:var(--font-display);
+  font-size:14px;font-weight:700;color:var(--gold);
+}
+.luck-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px}
+.luck-item{display:flex;align-items:baseline;gap:7px;font-size:13px}
+.luck-item i{font-style:normal;color:var(--hanji-dim);font-size:11.5px;min-width:32px}
+.luck-item b{font-weight:700;color:var(--hanji)}
+.luck-note{margin:9px 0 4px;font-size:12.5px;line-height:1.6;color:var(--hanji-dim)}
+
+/* 6. 부적 진열대 */
+.shop-row{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.shop-item{
+  display:flex;flex-direction:column;gap:4px;align-items:center;
+  font:inherit;cursor:pointer;padding:6px 3px;
+  background:transparent;border:1px solid transparent;border-radius:9px;
+  color:var(--hanji-dim);
+}
+.shop-item img{
+  width:100%;aspect-ratio:675/1200;object-fit:cover;border-radius:4px;display:block;
+  opacity:.82;transition:opacity .15s ease;
+}
+.shop-item.is-today{border-color:var(--gold);color:var(--gold)}
+.shop-item.is-today img{opacity:1;box-shadow:0 0 12px rgba(201,162,39,.28)}
+.shop-item:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.shop-cap{font-size:10.5px;font-weight:700}
+
+/* 홈 복귀 버튼 */
+/* 홈 복귀 버튼 — 보이는 알약 크기(36px)는 유지하되 터치 타깃은 44px 이상 확보한다.
+ * (v4 스펙 5항 · 2026-08-22 실측 43x36px 미달 적발)
+ * position:relative + ::before 히트영역 = 주간 그래프 week-hit와 같은 방식. */
+.btn-home{
+  position:relative;
+  align-self:flex-start;font:inherit;font-size:12.5px;font-weight:700;cursor:pointer;
+  background:transparent;color:var(--gold);
+  border:1px solid var(--line);border-radius:999px;
+  padding:0 14px;
+  min-width:var(--tap);
+  min-height:36px;
+}
+/* 시각 크기를 키우지 않고 눌리는 영역만 상하좌우로 넓혀 44px을 만든다 */
+.btn-home::before{
+  content:"";position:absolute;left:0;right:0;
+  top:50%;transform:translateY(-50%);
+  height:var(--tap);
+  min-height:var(--tap);
+}
+.btn-home[hidden]{display:none}
+.btn-home:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+/* SD 등급 게이지 */
+.gauge-svg{display:block;width:100%;max-width:280px;margin:2px auto 0;overflow:visible}
+.gauge-seg{fill:var(--ink-2);stroke:var(--line);stroke-width:1}
+.gauge-seg.is-on{fill:rgba(201,162,39,.18);stroke:var(--gold);stroke-width:1.4}
+.gauge-label{font-size:10.5px;text-anchor:middle;fill:var(--hanji-dim)}
+.gauge-label.is-on{fill:var(--gold);font-weight:700}
+/* 주의 등급은 주사 계열로 — 홈 카드 배지(주의=주사)와 색 의미를 맞춘다.
+ * 라벨은 순수 주사(#B3402A)가 어두운 바탕에서 3.33:1이라 미달이므로,
+ * 캡션 4.5:1을 넘는 밝은 주사 계열(--warn #E0764F 6.22:1)을 쓴다. */
+.gauge-seg.is-on.is-warn{fill:rgba(179,64,42,.20);stroke:var(--jusa)}
+.gauge-label.is-on.is-warn{fill:var(--warn)}
+
+@media (max-width:360px){
+  .area-card{padding:10px;min-height:70px}
+  .home-score-num{font-size:33px}
+  .shop-row{gap:4px}
+}
