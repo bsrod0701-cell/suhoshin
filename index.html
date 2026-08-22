@@ -6,7 +6,12 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐉</text></svg>">
 <title>내 수호신</title>
 <meta name="description" content="생년월일로 3초 만에 내 수호신을 찾고, 오늘의 흐름을 확인하세요.">
-<link rel="stylesheet" href="style.css">
+<!-- 폰트 1종만 예외 허용(스펙 1장): Gowun Batang. 그 외 CDN은 계속 금지.
+     preconnect로 지연 최소화, display=swap으로 폰트 미도착 시에도 즉시 렌더. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap">
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 
@@ -159,7 +164,11 @@
 
       <!-- 오행 분포 -->
       <h3 class="sec-title">오행 분포 <span class="sec-sub" id="saElTotal"></span></h3>
-      <div class="el-bars" id="saElBars"></div>
+      <div id="saElPenta"></div>
+      <div class="el-legend">
+        <span class="lg-saeng"><i></i>상생</span>
+        <span class="lg-geuk"><i></i>상극</span>
+      </div>
 
       <!-- 선천 성격 -->
       <h3 class="sec-title">타고난 성격</h3>
@@ -196,10 +205,27 @@
 
       <div class="area-list" id="areaList"></div>
 
+      <!-- 오늘의 풀이 프로즈 (v4 — 매일 읽으러 오는 층) -->
+      <h3 class="sec-title">오늘의 풀이</h3>
+      <p class="prose" id="flowProse">—</p>
+
       <details class="why" id="whyToggle">
         <summary>왜 이 점수?</summary>
         <p class="why-line" id="whyLine">—</p>
       </details>
+
+      <!-- 오늘 채울 기운 -> 부적 연동 (재구매 엔진) -->
+      <div class="need-card" id="needCard">
+        <div class="need-art">
+          <img id="needImg" alt="" decoding="async">
+        </div>
+        <div class="need-body">
+          <p class="need-eyebrow">오늘 채울 기운</p>
+          <p class="need-el" id="needEl">—</p>
+          <p class="need-why" id="needWhy">—</p>
+          <button class="btn btn-cta sm" id="btnNeedCta">이 부적 소장하기</button>
+        </div>
+      </div>
 
       <button class="btn btn-main" id="toS4">오늘의 부적 보기</button>
       <button class="btn btn-ghost" id="backToS2">내 수호신 다시 보기</button>
@@ -304,9 +330,9 @@
   </div>
 </div>
 
-<script src="vendor/manseryeok.js"></script>
-<script src="saju.js"></script>
-<script src="profile.js"></script>
-<script src="app.js"></script>
+<script src="vendor/manseryeok.js?v=4"></script>
+<script src="saju.js?v=4"></script>
+<script src="profile.js?v=4"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

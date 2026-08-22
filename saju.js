@@ -282,6 +282,280 @@
   }
 
 
+
+  /* =========================================================
+   * 8. 오늘의 풀이 프로즈 (스펙 2장 — 결정론 조립, AI 호출 0)
+   *
+   * [A 오늘의 기운] 일진 천간 십성 × 지지 십성 (십성 10종 × 3변형)
+   * [B 밝은 영역]   오늘 가장 좋은 영역 + 활용 조언
+   * [C 주의 영역]   주의 영역 + 구체 행동 조언 (불안 조장 금지)
+   * [D 마무리]      점수대(吉/平/凶)별 마무리
+   * 변형 선택 = (일진 순번 + 일주 순번) mod 변형수 — 결정론이되 어제와 다른 문장.
+   * 전 문장 자체 작성. 존댓말, 확언 어미 금지, 의료·투자 확언 금지.
+   * ======================================================= */
+
+  // [A] 십성 10종 × 3변형 — 천간(주축) 기준 서술
+  var PROSE_A = {
+    '비견': [
+      '오늘은 나와 결이 같은 기운이 곁에 서는 날입니다. 혼자 애쓰던 일에 손을 보태 줄 사람이 나타나기 좋습니다.',
+      '오늘은 어깨를 나란히 하는 기운이 도는 날입니다. 경쟁보다 협력 쪽으로 방향을 잡으면 훨씬 수월합니다.',
+      '오늘은 내 페이스를 지키기 좋은 날입니다. 남과 비교하지 않고 하던 속도대로 가면 됩니다.'
+    ],
+    '겁재': [
+      '오늘은 밀고 당기는 기운이 강한 날입니다. 욕심을 조금 덜어내면 손에 남는 것이 오히려 늘어납니다.',
+      '오늘은 무언가를 나눠야 하는 기운이 도는 날입니다. 내 몫을 먼저 정해 두면 흔들리지 않습니다.',
+      '오늘은 승부욕이 앞서기 쉬운 날입니다. 한 발 물러서는 쪽이 결과적으로 이기는 자리입니다.'
+    ],
+    '식신': [
+      '오늘은 안에 있던 것이 밖으로 잘 나오는 날입니다. 표현하고 만들어 내는 일에 기운이 붙습니다.',
+      '오늘은 여유가 생기는 기운입니다. 먹고 쉬고 즐기는 일에 마음을 조금 써도 좋은 날입니다.',
+      '오늘은 손끝이 잘 도는 날입니다. 미뤄 둔 작업을 꺼내면 생각보다 매끄럽게 풀립니다.'
+    ],
+    '상관': [
+      '오늘은 하고 싶은 말이 많아지는 날입니다. 날을 조금만 다듬으면 그 말이 제 값을 합니다.',
+      '오늘은 틀을 벗어나고 싶은 기운이 도는 날입니다. 새로운 방식을 시험해 보기에는 나쁘지 않습니다.',
+      '오늘은 예리함이 살아나는 날입니다. 남의 허점이 잘 보이는 만큼 표현은 한 겹 감싸는 편이 좋습니다.'
+    ],
+    '편재': [
+      '오늘은 기회가 넓게 열리는 날입니다. 여러 갈래가 보이니 하나만 골라 손에 쥐면 됩니다.',
+      '오늘은 바깥으로 움직일수록 얻는 것이 있는 날입니다. 사람을 만나고 자리를 옮겨 보세요.',
+      '오늘은 눈이 밝아지는 기운입니다. 지나치던 것에서 쓸모를 발견하기 좋습니다.'
+    ],
+    '정재': [
+      '오늘은 쌓아 온 것이 모양을 갖추는 날입니다. 꾸준히 해 온 일에서 결실이 보이기 좋습니다.',
+      '오늘은 셈이 맞아떨어지는 기운입니다. 숫자와 약속을 챙기면 그대로 남습니다.',
+      '오늘은 착실함이 힘을 발휘하는 날입니다. 새로 벌이기보다 하던 것을 마무리하기 좋습니다.'
+    ],
+    '편관': [
+      '오늘은 어깨를 누르는 기운이 있는 날입니다. 다만 그 무게가 실력을 끌어올리는 쪽으로 쓰이기도 합니다.',
+      '오늘은 예상 밖의 요구가 들어오기 쉬운 날입니다. 감당할 만큼만 맡으면 무리가 없습니다.',
+      '오늘은 긴장이 도는 기운입니다. 미리 대비해 둔 사람에게는 오히려 기회가 되는 자리입니다.'
+    ],
+    '정관': [
+      '오늘은 질서가 잡히는 기운입니다. 정해진 절차대로 가면 매끄럽게 통과합니다.',
+      '오늘은 맡은 자리에서 인정받기 좋은 날입니다. 성실함이 눈에 띄는 자리입니다.',
+      '오늘은 원칙이 힘이 되는 날입니다. 편법보다 정공법이 빠른 길입니다.'
+    ],
+    '편인': [
+      '오늘은 생각이 안으로 깊어지는 날입니다. 답을 서둘러 내기보다 한 번 더 살펴보기 좋습니다.',
+      '오늘은 남다른 시선이 열리는 기운입니다. 평소와 다른 각도에서 실마리가 보입니다.',
+      '오늘은 혼자만의 시간이 필요한 날입니다. 사람보다 자료와 마주하는 편이 편안합니다.'
+    ],
+    '정인': [
+      '오늘은 받쳐 주는 손이 있는 날입니다. 도움을 청하면 생각보다 쉽게 닿습니다.',
+      '오늘은 배우고 채우기 좋은 기운입니다. 새로 익힌 것이 오래 남는 자리입니다.',
+      '오늘은 마음이 안정되는 날입니다. 무리하지 않아도 흐름이 나를 받쳐 줍니다.'
+    ]
+  };
+
+  // [A 보조] 지지 십성으로 한 문장 덧붙이기 — 길/흉/중 3군 × 2변형
+  var PROSE_A2 = {
+    '길': [
+      '바탕에 깔린 기운도 순한 편이라 하루가 크게 흔들리지 않고, 무리해서 붙잡지 않아도 제자리를 찾아갑니다.',
+      '아래를 받치는 기운이 부드러워 시작한 일이 이어지기 좋습니다. 오늘 벌인 것은 내일까지 끌고 갈 만합니다.'
+    ],
+    '흉': [
+      '다만 바탕에 걸리는 기운이 있어 속도를 내면 부딪히기 쉽습니다. 한 박자 늦추는 것만으로 대부분은 지나갑니다.',
+      '아래쪽에 껄끄러운 기운이 섞여 있으니 무리한 확장은 미루는 편이 좋습니다. 오늘은 넓히기보다 지키는 자리입니다.'
+    ],
+    '중': [
+      '바탕은 무난해서 평소의 리듬을 유지하면 됩니다. 굳이 새 변수를 만들지 않는 쪽이 편안합니다.',
+      '아래를 받치는 기운은 조용한 편이라 큰 변수는 보이지 않습니다. 하던 순서대로 가면 무리가 없습니다.'
+    ]
+  };
+
+  // [B] 밝은 영역 4종 × 2변형
+  var PROSE_B = {
+    '재물': [
+      '오늘 가장 밝은 쪽은 재물입니다. 미뤄 둔 정산이나 계약을 꺼내기 좋은 자리이니, 숫자를 확인하고 마무리까지 붙여 두세요.',
+      '재물 쪽 흐름이 열려 있습니다. 들어올 것을 챙기고 나갈 것을 정리해 두면, 오늘 정한 기준이 다음 달까지 갑니다.'
+    ],
+    '애정': [
+      '오늘 가장 밝은 쪽은 애정입니다. 마음을 전하면 평소보다 잘 닿으니, 미뤄 둔 말을 짧게라도 건네 보세요.',
+      '사람 사이가 부드러운 날입니다. 먼저 연락하는 쪽이 유리하고, 오래 못 본 사람일수록 반응이 좋습니다.'
+    ],
+    '일': [
+      '오늘 가장 밝은 쪽은 일입니다. 맡은 것을 밀고 나가면 성과가 눈에 보이니, 가장 무거운 안건부터 손대 보세요.',
+      '일 쪽에 힘이 실립니다. 중요한 이야기를 오늘 자리에 올리면 통과가 수월하고, 결정도 빨리 납니다.'
+    ],
+    '건강': [
+      '오늘 가장 밝은 쪽은 건강입니다. 기운이 잘 도니 미뤄 둔 운동을 가볍게 시작하기 좋은 자리입니다.',
+      '몸이 가벼운 날입니다. 컨디션이 좋을 때 생활 리듬을 잡아 두면 다음 주가 훨씬 수월해집니다.'
+    ]
+  };
+
+  // [C] 주의 영역 4종 × 2변형 — 불안 조장 금지, 구체 행동 조언
+  var PROSE_C = {
+    '재물': [
+      '반면 재물 쪽은 살펴야 합니다. 오늘은 큰 지출을 결정하지 말고 하루만 미뤄 보세요.',
+      '재물 쪽은 새는 곳이 생기기 쉽습니다. 자동 결제와 잔돈 지출을 한 번 점검해 두면 좋습니다.'
+    ],
+    '애정': [
+      '반면 애정 쪽은 말이 어긋나기 쉽습니다. 문자보다 목소리로 확인하면 오해가 줄어듭니다.',
+      '가까운 사이일수록 표현을 아끼지 마세요. 짐작으로 넘기면 서운함이 남는 날입니다.'
+    ],
+    '일': [
+      '반면 일 쪽은 압박이 몰립니다. 오늘 할 일을 세 가지로 줄이고 나머지는 내일로 넘기세요.',
+      '일에서 재촉이 들어오기 쉽습니다. 마감을 다시 확인하고 도움을 청할 곳을 미리 정해 두세요.'
+    ],
+    '건강': [
+      '반면 몸은 무리가 쌓이기 쉽습니다. 늦은 시간까지 붙잡지 말고 잠을 먼저 챙기세요.',
+      '건강 쪽은 신호를 흘리기 쉬운 날입니다. 물을 자주 마시고 자리에서 한 번씩 일어나 보세요.'
+    ]
+  };
+
+  // [D] 점수대별 마무리 — 吉(70+) / 平(50~69) / 凶(50 미만) × 3변형
+  var PROSE_D = {
+    '길': [
+      '전체적으로 순한 하루입니다. 마음먹은 것을 한 걸음 진행해 두면, 오늘의 기운이 그대로 남습니다.',
+      '오늘은 흐름이 나를 밀어 주는 편입니다. 미뤄 둔 일을 꺼내기 좋은 날이니 하나만 골라 끝을 보세요.',
+      '기운이 고르게 도는 하루입니다. 평소보다 조금 더 욕심내도 괜찮으니, 원하던 자리에 손을 뻗어 보세요.'
+    ],
+    '평': [
+      '큰 굴곡은 없는 하루입니다. 하던 대로만 해도 무난하게 지나가니, 새로운 부담은 만들지 마세요.',
+      '오늘은 평탄한 편입니다. 새로 벌이기보다 정리하는 쪽이 어울리고, 그 정리가 다음 기회를 엽니다.',
+      '무리하지 않으면 조용히 흘러가는 날입니다. 한 가지만 확실히 끝내 두면 하루가 아깝지 않습니다.'
+    ],
+    '흉': [
+      '오늘은 속도를 늦추는 편이 낫습니다. 중요한 결정은 하루 미뤄도 늦지 않고, 그 하루가 실수를 막아 줍니다.',
+      '지키는 것만으로 충분한 하루입니다. 벌여 둔 일을 하나씩 접어 두면 내일 다시 시작하기 쉬워집니다.',
+      '오늘은 나를 돌보는 데 시간을 쓰세요. 무리해서 밀어붙이기보다 내일 움직이는 편이 훨씬 가볍습니다.'
+    ]
+  };
+
+  // [E] 오늘 채울 기운 — 오행 5종 × 3변형. 생활 행동 조언(의료·투자 확언 금지).
+  var PROSE_E = {
+    '목': [
+      '오늘 채우면 좋은 것은 목木의 기운입니다. 잠깐이라도 초록을 보거나 바람이 통하는 곳을 걸으면 막힌 곳이 풀립니다.',
+      '오늘은 목木의 기운을 곁에 두세요. 새로 시작하는 작은 일 하나를 정해 두면 하루에 방향이 생깁니다.',
+      '목木의 기운이 오늘을 받쳐 줍니다. 자라나는 것을 가까이 두고, 계획을 한 줄로 적어 보세요.'
+    ],
+    '화': [
+      '오늘 채우면 좋은 것은 화火의 기운입니다. 볕을 잠깐 쬐거나 따뜻한 것을 마시면 기운이 살아납니다.',
+      '오늘은 화火의 기운을 곁에 두세요. 마음에 담아 둔 말을 한 사람에게라도 꺼내면 한결 가벼워집니다.',
+      '화火의 기운이 오늘을 밝혀 줍니다. 밝은 자리, 밝은 색을 가까이 두면 흐름이 돕습니다.'
+    ],
+    '토': [
+      '오늘 채우면 좋은 것은 토土의 기운입니다. 자리를 정돈하고 발밑을 단단히 하면 마음이 가라앉습니다.',
+      '오늘은 토土의 기운을 곁에 두세요. 벌여 둔 것 중 하나를 제자리에 돌려놓으면 하루가 정리됩니다.',
+      '토土의 기운이 오늘의 중심을 잡아 줍니다. 무리한 이동보다 익숙한 자리를 지키는 편이 좋습니다.'
+    ],
+    '금': [
+      '오늘 채우면 좋은 것은 금金의 기운입니다. 흐릿하게 두었던 것을 하나 정해 매듭지으면 개운해집니다.',
+      '오늘은 금金의 기운을 곁에 두세요. 쓰지 않는 것을 덜어내면 남은 것이 또렷해집니다.',
+      '금金의 기운이 오늘의 기준을 세워 줍니다. 결정을 미루지 말고 선을 분명히 그어 보세요.'
+    ],
+    '수': [
+      '오늘 채우면 좋은 것은 수水의 기운입니다. 물을 자주 마시고 잠을 넉넉히 두면 흐름이 돌아옵니다.',
+      '오늘은 수水의 기운을 곁에 두세요. 서둘러 답하지 말고 하루만 재워 두면 길이 보입니다.',
+      '수水의 기운이 오늘을 유연하게 만듭니다. 굳이 맞서지 말고 흐르는 쪽으로 몸을 맡겨 보세요.'
+    ]
+  };
+
+  /** 점수 -> 등급(도장 글자와 연동) */
+  function scoreGrade(score) {
+    if (score >= 70) return '길';
+    if (score >= 50) return '평';
+    return '흉';
+  }
+  var GRADE_SEAL = { '길': '吉', '평': '平', '흉': '凶' };
+
+  /**
+   * 오늘의 풀이 프로즈 조립 (300~420자 목표, 결정론).
+   * @param opts {stemGod, branchGod, score, bright, caution, todayNo, myNo}
+   */
+  function todayProse(opts) {
+    var seed = opts.todayNo + opts.myNo;         // 스펙: (일진 순번 + 일주 순번)
+    var pick = function (arr, off) { return arr[mod(seed + (off || 0), arr.length)]; };
+
+    var a1 = pick(PROSE_A[opts.stemGod], 0);
+    var a2 = pick(PROSE_A2[godClass(opts.branchGod)], 1);
+    var b = opts.bright ? pick(PROSE_B[opts.bright], 2) : '';
+    var c = opts.caution ? pick(PROSE_C[opts.caution], 3) : '';
+    var grade = scoreGrade(opts.score);
+    var d = pick(PROSE_D[grade], 4);
+    // [E] 오늘 채울 기운 — 용신 결과와 같은 오행을 쓴다(부적 연동 근거 문장)
+    var e = opts.needEl ? pick(PROSE_E[opts.needEl], 5) : '';
+
+    var parts = [a1, a2, b, c, e, d].filter(function (x) { return !!x; });
+    return {
+      grade: grade,
+      seal: GRADE_SEAL[grade],
+      text: parts.join(' '),
+      blocks: { A: a1 + ' ' + a2, B: b, C: c, E: e, D: d }
+    };
+  }
+
+  /* =========================================================
+   * 9. 간이 용신 — "오늘 채울 기운" (스펙 2장, 결정론 순수 함수)
+   *
+   * 규칙(방법론 리포트 3장 기반):
+   *  ① 오늘 일진이 내 일간을 극하는 날(관성)이면 -> 나를 생(生)하는 오행(인성)으로 받친다.
+   *  ② 그 외에는 오늘 "주의" 영역이 담당하는 십성의 오행을 채운다.
+   *  ③ 주의 영역이 없으면(이론상 없음) 일간을 생하는 오행으로 폴백.
+   * ======================================================= */
+
+  // 영역 -> 담당 십성 (진단 엔진과 동일 규약)
+  var AREA_GOD = { '재물': '재성', '애정': '식상', '일': '관성', '건강': '인성' };
+
+  /** 내 일간 오행 X 기준, 십성군이 가리키는 오행 */
+  function elementOfGroup(x, group) {
+    if (group === '비겁') return x;
+    if (group === '인성') return reverseSaeng(x);   // 나를 생하는 것
+    if (group === '식상') return SAENG[x];          // 내가 생하는 것
+    if (group === '재성') return GEUK[x];           // 내가 극하는 것
+    if (group === '관성') return reverseGeuk(x);    // 나를 극하는 것
+    return x;
+  }
+  function reverseSaeng(x) {
+    for (var k in SAENG) if (SAENG[k] === x) return k;
+    return x;
+  }
+  function reverseGeuk(x) {
+    for (var k in GEUK) if (GEUK[k] === x) return k;
+    return x;
+  }
+
+  /**
+   * 오늘 채울 기운(간이 용신).
+   * @param dayStem 내 일간
+   * @param todayStem 오늘 천간
+   * @param caution 오늘 주의 영역('재물'|'애정'|'일'|'건강'|null)
+   * @returns {오행, 사유코드, 이유}
+   */
+  function neededElement(dayStem, todayStem, caution) {
+    var x = STEM_EL[dayStem];
+    var g1 = tenGod(dayStem, todayStem);
+
+    // ① 일진 천간이 나를 극하는 날(편관·정관) -> 나를 생하는 오행으로 받친다
+    if (g1 === '편관' || g1 === '정관') {
+      var el = reverseSaeng(x);
+      return {
+        오행: el,
+        사유코드: 'guan',
+        이유: '오늘은 밖에서 밀어붙이는 기운이 강한 날이라, 나를 받쳐 주는 ' + el + EL_HANJA[el] + ' 기운이 필요합니다.'
+      };
+    }
+
+    // ② 주의 영역이 담당하는 십성의 오행
+    if (caution && AREA_GOD[caution]) {
+      var el2 = elementOfGroup(x, AREA_GOD[caution]);
+      return {
+        오행: el2,
+        사유코드: 'caution',
+        이유: '오늘 ' + caution + ' 쪽이 헐거워지기 쉬워, 그 자리를 메우는 ' + el2 + EL_HANJA[el2] + ' 기운이 필요합니다.'
+      };
+    }
+
+    // ③ 폴백 — 나를 생하는 오행
+    var el3 = reverseSaeng(x);
+    return {
+      오행: el3,
+      사유코드: 'fallback',
+      이유: '오늘은 나를 받쳐 주는 ' + el3 + EL_HANJA[el3] + ' 기운을 채워 두면 하루가 한결 편안합니다.'
+    };
+  }
+
   /* =========================================================
    * 7. 자체 검증 (리포트 표와 전수 대조 — 콘솔 self-test)
    * ======================================================= */
@@ -412,6 +686,129 @@
     var noHour = { year: pil.year, month: pil.month, day: pil.day, hour: null };
     check('시주 모름 합계 6', elementCount(noHour).합계, 6);
 
+
+    /* ---------- v4 신규: 프로즈 조립 검증 (스펙 2·4장) ---------- */
+    var GODS = Object.keys(GOD_PLAIN);
+    var AREAS = ['재물', '애정', '일', '건강'];
+
+    // 문장 라이브러리 완전성
+    check('[A] 십성 10종 문장', Object.keys(PROSE_A).length, 10);
+    var aVar = 0;
+    for (var ak in PROSE_A) if (PROSE_A[ak].length >= 3) aVar++;
+    check('[A] 각 십성 3변형 이상', aVar, 10);
+    check('[A2] 길흉중 3군', Object.keys(PROSE_A2).length, 3);
+    check('[B] 4영역', Object.keys(PROSE_B).length, 4);
+    check('[C] 4영역', Object.keys(PROSE_C).length, 4);
+    check('[D] 3등급', Object.keys(PROSE_D).length, 3);
+    check('[E] 오행 5종', Object.keys(PROSE_E).length, 5);
+
+    // 전수 조립: 십성 10 × 10 × 밝은 4 × 주의 4 × 오행 5 (변형 3회전)
+    var pMissing = 0, pShort = 0, pLong = 0, pTone = 0, pTotal = 0;
+    var pMin = 9999, pMax = 0;
+    for (var pi = 0; pi < GODS.length; pi++) {
+      for (var pj = 0; pj < GODS.length; pj++) {
+        for (var pb = 0; pb < AREAS.length; pb++) {
+          for (var pc = 0; pc < AREAS.length; pc++) {
+            for (var pe = 0; pe < EL_ORDER.length; pe++) {
+              for (var pk = 0; pk < 3; pk++) {
+                var pr = todayProse({
+                  stemGod: GODS[pi], branchGod: GODS[pj],
+                  score: [38, 60, 88][pk],
+                  bright: AREAS[pb], caution: AREAS[pc],
+                  needEl: EL_ORDER[pe],
+                  todayNo: pk * 11 + 1, myNo: pk * 7 + 2
+                });
+                pTotal++;
+                // 다섯 블록이 모두 채워졌는가
+                if (!pr.blocks.A || !pr.blocks.B || !pr.blocks.C || !pr.blocks.D || !pr.blocks.E) pMissing++;
+                if (!pr.text || pr.text.indexOf('undefined') >= 0) pMissing++;
+                var L = pr.text.length;
+                if (L < pMin) pMin = L;
+                if (L > pMax) pMax = L;
+                if (L < 300) pShort++;
+                if (L > 420) pLong++;
+                // 확언 어미·의료/투자 확언 금지
+                if (/반드시|틀림없이|보장|확실히 오릅니다|완치/.test(pr.text)) pTone++;
+              }
+            }
+          }
+        }
+      }
+    }
+    check('프로즈 전수 조합', pTotal, 24000);
+    check('프로즈 블록 누락', pMissing, 0);
+    check('프로즈 300자 미만', pShort, 0);
+    check('프로즈 420자 초과', pLong, 0);
+    check('프로즈 확언·과장 어미', pTone, 0);
+
+    // 결정론: 같은 입력 200회 동일
+    var detArgs = { stemGod: '겁재', branchGod: '겁재', score: 38, bright: '건강', caution: '재물', needEl: '수', todayNo: 5, myNo: 16 };
+    var detFirst = todayProse(detArgs).text, detOk = true;
+    for (var dz = 0; dz < 200; dz++) if (todayProse(detArgs).text !== detFirst) { detOk = false; break; }
+    check('프로즈 결정론 200회', detOk, 'true');
+
+    // 7일 무반복: 같은 사용자(일주 고정)가 연속 7일 방문 — 일진 순번은 매일 +1
+    var repeatFail = 0, sameCheck = 0;
+    for (var myNo = 1; myNo <= 60; myNo++) {
+      var seen = {};
+      for (var d7 = 0; d7 < 7; d7++) {
+        var tNo = ((myNo + d7 - 1) % 60) + 1;
+        var txt = todayProse({
+          stemGod: GODS[(myNo + d7) % 10], branchGod: GODS[(myNo + d7 * 3) % 10],
+          score: 50 + ((myNo + d7) % 40),
+          bright: AREAS[(myNo + d7) % 4], caution: AREAS[(myNo + d7 * 2) % 4],
+          needEl: EL_ORDER[(myNo + d7) % 5],
+          todayNo: tNo, myNo: myNo
+        }).text;
+        if (seen[txt]) repeatFail++;
+        seen[txt] = 1;
+        sameCheck++;
+      }
+    }
+    check('7일 연속 프로즈 반복(60일주 전수)', repeatFail, 0);
+    check('7일 시뮬 표본 수', sameCheck, 420);
+
+    /* ---------- v4 신규: 간이 용신 ---------- */
+    var needBad = 0, needMiss = 0, needKinds = {};
+    for (var ns = 0; ns < STEMS.length; ns++) {
+      for (var nt = 0; nt < STEMS.length; nt++) {
+        for (var na = 0; na < AREAS.length; na++) {
+          var nr = neededElement(STEMS[ns], STEMS[nt], AREAS[na]);
+          if (!nr || !nr.오행 || !EL_HANJA[nr.오행]) needBad++;
+          if (!nr.이유 || nr.이유.length < 10) needMiss++;
+          needKinds[nr.오행] = (needKinds[nr.오행] || 0) + 1;
+        }
+      }
+    }
+    check('용신 전수 유효(400조합)', needBad, 0);
+    check('용신 사유 문장 누락', needMiss, 0);
+    check('용신 오행 5종 모두 출현', Object.keys(needKinds).length, 5);
+    // 결정론
+    var nDet = neededElement('기', '무', '재물').오행, nOk = true;
+    for (var nz = 0; nz < 200; nz++) if (neededElement('기', '무', '재물').오행 !== nDet) { nOk = false; break; }
+    check('용신 결정론 200회', nOk, 'true');
+    // 규칙 ①: 관성 날은 인성(나를 생하는) 오행
+    var gStem = null;
+    for (var gs = 0; gs < STEMS.length; gs++) {
+      if (tenGod('기', STEMS[gs]) === '정관' || tenGod('기', STEMS[gs]) === '편관') { gStem = STEMS[gs]; break; }
+    }
+    var gRes = neededElement('기', gStem, '재물');
+    check('용신 규칙① 관성날=인성 오행', gRes.오행 + gRes.사유코드, elementOfGroup(STEM_EL['기'], '인성') + 'guan');
+    // 규칙 ②: 비관성 날은 주의 영역 담당 오행
+    var nStem = null;
+    for (var ns2 = 0; ns2 < STEMS.length; ns2++) {
+      var tg = tenGod('기', STEMS[ns2]);
+      if (tg !== '정관' && tg !== '편관') { nStem = STEMS[ns2]; break; }
+    }
+    var cRes = neededElement('기', nStem, '재물');
+    check('용신 규칙② 주의영역 오행', cRes.오행, elementOfGroup(STEM_EL['기'], AREA_GOD['재물']));
+
+    // 등급·도장 연동
+    check('등급 70+ = 길', scoreGrade(70), '길');
+    check('등급 50~69 = 평', scoreGrade(50), '평');
+    check('등급 50미만 = 흉', scoreGrade(49), '흉');
+    check('도장 글자 3종', [GRADE_SEAL['길'], GRADE_SEAL['평'], GRADE_SEAL['흉']].join(''), '吉平凶');
+
     if (!quiet && typeof console !== 'undefined') {
       if (failed === 0) console.log('%c[saju self-test] ' + res.length + '건 PASS', 'color:#0a7d33;font-weight:bold');
       else { console.error('[saju self-test] 실패 ' + failed + '건'); if (console.table) console.table(res.filter(function (r) { return r.판정 === 'FAIL'; })); }
@@ -431,6 +828,10 @@
     elementCount: elementCount, strength: strength,
     DAY_MASTER: DAY_MASTER, personality: personality,
     SCORE_FLOOR: SCORE_FLOOR, SCORE_CEIL: SCORE_CEIL,
+    PROSE_A: PROSE_A, PROSE_A2: PROSE_A2, PROSE_B: PROSE_B, PROSE_C: PROSE_C, PROSE_D: PROSE_D,
+    PROSE_E: PROSE_E,
+    scoreGrade: scoreGrade, GRADE_SEAL: GRADE_SEAL, todayProse: todayProse,
+    AREA_GOD: AREA_GOD, neededElement: neededElement, elementOfGroup: elementOfGroup,
     SCORE_TABLE: SCORE_TABLE, todayScore: todayScore,
     selfTest: selfTest
   };

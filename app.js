@@ -335,8 +335,9 @@
   var PRESCRIPTION = {
     '재물': { 부적: '재물 부적', 카피: '오늘 재물 기운이 새는 날 — 재물 부적으로 단속하세요.' },
     '애정': { 부적: '연애 부적', 카피: '오늘 마음이 어긋나기 쉬운 날 — 연애 부적으로 이어 두세요.' },
-    '일': { 부적: '합격 부적', 카피: '오늘 압박이 몰리는 날 — 합격 부적으로 중심을 잡으세요.' },
-    '건강': { 부적: '면접 부적', 카피: '오늘 기운이 빠지기 쉬운 날 — 면접 부적으로 기세를 세우세요.' }
+    '일': { 부적: '합격 부적', 카피: '오늘 압박이 몰리는 날 — 합격 부적으로 중심을 잡으세요.' }
+    // '건강'은 목적 부적 4종(합격·면접·재물·연애)에 대응물이 없다. 억지 매핑(구판: 면접) 대신
+    // "오늘 채울 기운" 부적 카드가 처방을 담당한다 — S4에서 rxBox를 숨긴다.
   };
 
   /* D1(하한 30) — 30점대 전용 요약 문구.
@@ -547,7 +548,7 @@
 
         if (!dg.summary || typeof dg.summary !== 'string') badSummary++;
         if (!dg.why || dg.why.indexOf('—') < 0) badWhy++;
-        if (!dg.prescription || !dg.prescription.카피) badPrescription++;
+        if (dg.caution !== '건강' && (!dg.prescription || !dg.prescription.카피)) badPrescription++; // 건강=용신 카드가 처방
         if (dg.caution && rxCount.hasOwnProperty(dg.caution)) rxCount[dg.caution]++;
 
         hist[dg.score] = (hist[dg.score] || 0) + 1;
@@ -596,7 +597,7 @@
 
 
     /* ---------- 3-5. 처방 연결 무결성 ---------- */
-    check('처방 테이블 4영역 완비', Object.keys(PRESCRIPTION).length, 4);
+    check('처방 테이블 3영역 완비(건강=용신 카드 담당)', Object.keys(PRESCRIPTION).length, 3);
     check('영역 문구 4×3 완비',
       Object.keys(AREA_TEXT).length * 3, 12);
     var summaryCount = 0;
@@ -964,7 +965,7 @@
   var doc = win.document;
   var $ = function (id) { return doc.getElementById(id); };
   var state = { ilju: null, guardian: null, talisman: null, diag: null, ctaShown: false,
-    profile: null, pillars: null, strength: null };
+    profile: null, pillars: null, strength: null, need: null, prose: null };
   var reached = {};
 
   function show(screenId) {
@@ -1034,6 +1035,47 @@
     $('flowDate').textContent = today.replace(/-/g, '. ');
     $('flowGanji').textContent = t.일주_한글 + '(' + t.일주_한자 + ') · ' + t.오행 + OHAENG_ATTR[t.오행].한자;
     $('flowSummary').textContent = summaryFor(dg, t.갑자순번, state.guardian.갑자순번);
+
+    /* v4 — 오늘의 풀이 프로즈 + 오늘 채울 기운(간이 용신 -> 부적 연동) */
+    var SJp = getSaju();
+    if (SJp && dg.tenGod && state.guardian.일간) {
+      // 가장 밝은 영역 = '좋음'인 영역 중 앞쪽(결정론). 없으면 '보통' 중 앞쪽.
+      var bright = null, mid = null;
+      for (var bi = 0; bi < AREA_ORDER.length; bi++) {
+        var an = AREA_ORDER[bi];
+        if (!bright && dg.areas[an] === '좋음') bright = an;
+        if (!mid && dg.areas[an] === '보통') mid = an;
+      }
+      bright = bright || mid || AREA_ORDER[0];
+
+      var need = SJp.neededElement(state.guardian.일간, t.일간, dg.caution);
+      state.need = need;
+
+      var prose = SJp.todayProse({
+        stemGod: dg.tenGod.stemGod,
+        branchGod: dg.tenGod.branchGod,
+        score: dg.score,
+        bright: bright,
+        caution: dg.caution,
+        needEl: need.오행,
+        todayNo: t.갑자순번,
+        myNo: state.guardian.갑자순번
+      });
+      state.prose = prose;
+
+      $('flowProse').textContent = prose.text;
+      $('scoreSeal').textContent = prose.seal;   // 吉/平/凶 점수 연동
+
+      // 오늘 채울 기운 카드
+      $('needEl').textContent = need.오행 + SJp.EL_HANJA[need.오행] + ' 기운의 부적';
+      $('needWhy').textContent = need.이유;
+      var img = $('needImg');
+      img.src = CARD_FILE[need.오행];
+      img.alt = need.오행 + ' 기운의 부적 카드';
+      $('needCard').hidden = false;
+    } else {
+      $('needCard').hidden = true;
+    }
     $('whyLine').textContent = dg.why;
 
     // 4영역
@@ -1121,10 +1163,13 @@
     var t = state.talisman;
     var dg = state.diag;
 
-    setCard($('talismanImg'), t.오행, '오늘의 부적 — ' + t.오행 + ' 기운');
+    /* v4 — 오늘의 부적은 "오늘 채울 기운"(간이 용신) 카드가 된다.
+     * 매일 이유가 바뀌므로 카드도 매일 달라진다(재구매 엔진). 용신이 없으면 일진 오행 폴백. */
+    var needEl = state.need ? state.need.오행 : t.오행;
+    setCard($('talismanImg'), needEl, '오늘의 부적 — ' + needEl + ' 기운');
     $('todayLabel').textContent = today.replace(/-/g, '. ') + ' 오늘의 부적';
-    $('talismanName').textContent = OHAENG_ATTR[t.오행].수식 + ' ' + t.띠 + '의 부적';
-    $('talismanLine').textContent = TODAY_LINE[t.오행];
+    $('talismanName').textContent = needEl + OHAENG_ATTR[needEl].한자 + ' 기운의 부적';
+    $('talismanLine').textContent = state.need ? state.need.이유 : TODAY_LINE[t.오행];
 
     // 진단 → 처방 연결 (변경 A)
     var rx = $('rxBox');
@@ -1574,7 +1619,7 @@
       var sGod = (key === 'day') ? '본인' : SJ.tenGod(dayStem, col.stem);
       var bGod = SJ.branchTenGod(dayStem, col.branch);
 
-      tdS.className = 'cell el-' + sEl;
+      tdS.className = 'cell el-' + sEl + (key === 'day' ? ' cell-self' : '');
       tdS.appendChild(cellInner(SJ.STEM_HANJA[col.stem], col.stem, sGod));
       tdB.className = 'cell el-' + bEl;
       tdB.appendChild(cellInner(SJ.BRANCH_HANJA[col.branch], col.branch, bGod));
@@ -1584,36 +1629,10 @@
     }
     $('saHourNote').hidden = !!pil.hour;
 
-    // 오행 분포
+    // 오행 분포 — 오각 다이어그램(SVG 자체 제작)
     var cnt = SJ.elementCount(pil);
     $('saElTotal').textContent = '(' + cnt.합계 + '글자 기준)';
-    var bars = $('saElBars');
-    bars.innerHTML = '';
-    for (var e = 0; e < SJ.EL_ORDER.length; e++) {
-      var el = SJ.EL_ORDER[e], n = cnt[el];
-      var row = doc.createElement('div');
-      row.className = 'el-row';
-
-      var nameEl = doc.createElement('span');
-      nameEl.className = 'el-name el-' + el;
-      nameEl.textContent = el + SJ.EL_HANJA[el];
-
-      var track2 = doc.createElement('span');
-      track2.className = 'el-track';
-      var fill = doc.createElement('span');
-      fill.className = 'el-fill el-bg-' + el;
-      fill.style.width = (cnt.합계 ? Math.round(n / cnt.합계 * 100) : 0) + '%';
-      track2.appendChild(fill);
-
-      var num = doc.createElement('span');
-      num.className = 'el-num' + (n === 0 ? ' is-zero' : '');
-      num.textContent = String(n);
-
-      row.appendChild(nameEl);
-      row.appendChild(track2);
-      row.appendChild(num);
-      bars.appendChild(row);
-    }
+    renderPentagon($('saElPenta'), cnt);
 
     // 선천 성격
     $('saPersona').textContent = per.본문;
@@ -1631,6 +1650,106 @@
         el_total: cnt.합계, has_hour: !!pil.hour
       });
     }
+  }
+
+  /* ---- 오행 오각 다이어그램 (인라인 SVG, 라이브러리 0) ----
+   * 정점 5개에 오행 원 + 개수. 상생(목→화→토→금→수→목)은 금색 실선,
+   * 상극(목→토→수→화→금→목)은 주사색 점선. 스펙 1장 컴포넌트 1.
+   */
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  var EL_FILL = {
+    '목': '#3E7C59', '화': '#B3402A', '토': '#C9A227', '금': '#C9CCD1', '수': '#2E4A6B'
+  };
+  // 개수 텍스트 색 — 각 원 위에서 대비가 확보되는 값(금·백은 어두운 글자)
+  var EL_TEXT = {
+    '목': '#F0E7D3', '화': '#F0E7D3', '토': '#1A1408', '금': '#1A1408', '수': '#F0E7D3'
+  };
+
+  function svgEl(name, attrs) {
+    var e = doc.createElementNS(SVG_NS, name);
+    for (var k in attrs) if (attrs.hasOwnProperty(k)) e.setAttribute(k, String(attrs[k]));
+    return e;
+  }
+
+  function renderPentagon(host, cnt) {
+    host.innerHTML = '';
+    var W = 280, H = 210, cx = W / 2, cy = 104, R = 74;
+
+    var svg = svgEl('svg', {
+      'class': 'el-penta', viewBox: '0 0 ' + W + ' ' + H,
+      role: 'img',
+      'aria-label': '오행 분포 — ' + SJ.EL_ORDER.map(function (e) {
+        return e + ' ' + cnt[e] + '개';
+      }).join(', ')
+    });
+
+    // 정점 좌표: 12시부터 시계방향으로 목·화·토·금·수(상생 순서 = 오각형 둘레)
+    var order = SJ.EL_ORDER;   // ['목','화','토','금','수']
+    var pos = {};
+    for (var i = 0; i < 5; i++) {
+      var ang = -Math.PI / 2 + (i * 2 * Math.PI / 5);
+      pos[order[i]] = { x: cx + R * Math.cos(ang), y: cy + R * Math.sin(ang) };
+    }
+
+    // 상극(점선) 먼저 = 별 모양 대각선. 뒤에 그려질 원에 가려지도록 순서 앞
+    for (var g = 0; g < order.length; g++) {
+      var from = order[g], to = SJ.GEUK[from];
+      if (!pos[to]) continue;
+      svg.appendChild(svgEl('line', {
+        'class': 'penta-line-geuk',
+        x1: pos[from].x.toFixed(1), y1: pos[from].y.toFixed(1),
+        x2: pos[to].x.toFixed(1), y2: pos[to].y.toFixed(1)
+      }));
+    }
+    // 상생(실선) = 오각형 둘레
+    for (var t = 0; t < order.length; t++) {
+      var f2 = order[t], t2 = SJ.SAENG[f2];
+      if (!pos[t2]) continue;
+      svg.appendChild(svgEl('line', {
+        'class': 'penta-line-saeng',
+        x1: pos[f2].x.toFixed(1), y1: pos[f2].y.toFixed(1),
+        x2: pos[t2].x.toFixed(1), y2: pos[t2].y.toFixed(1)
+      }));
+    }
+
+    // 정점 원 + 개수 + 라벨
+    for (var n = 0; n < order.length; n++) {
+      var el = order[n], v = cnt[el] || 0;
+      var p = pos[el];
+      // 개수에 따라 반지름을 살짝 키운다(0이면 작고 흐리게)
+      var r = 15 + Math.min(3, v) * 2.2;
+
+      // 개수 0 = "그 기운이 없다"는 정보다. 채우지 않고 흐린 윤곽선만 남겨
+      // 배경에 묻히지 않게 한다(2026-08-22 검수 반영).
+      var empty = (v === 0);
+      svg.appendChild(svgEl('circle', {
+        'class': 'penta-node' + (empty ? ' is-zero' : ''),
+        cx: p.x.toFixed(1), cy: p.y.toFixed(1), r: r.toFixed(1),
+        fill: empty ? 'none' : EL_FILL[el],
+        stroke: empty ? EL_FILL[el] : 'rgba(201,162,39,.45)',
+        'stroke-dasharray': empty ? '3 2' : 'none'
+      }));
+
+      var num = svgEl('text', {
+        'class': 'penta-count' + (empty ? ' is-zero-num' : ''),
+        x: p.x.toFixed(1), y: p.y.toFixed(1),
+        fill: empty ? '#A89E88' : EL_TEXT[el]
+      });
+      num.textContent = String(v);
+      svg.appendChild(num);
+
+      // 라벨은 바깥쪽으로 밀어 배치
+      var lx = cx + (p.x - cx) * 1.42, ly = cy + (p.y - cy) * 1.42;
+      var lab = svgEl('text', {
+        'class': 'penta-label',
+        x: lx.toFixed(1), y: (ly + 4).toFixed(1)
+      });
+      lab.textContent = el + SJ.EL_HANJA[el];
+      svg.appendChild(lab);
+    }
+
+    host.appendChild(svg);
+    return svg;
   }
 
   function cellInner(hanja, korean, god) {
@@ -1703,6 +1822,20 @@
   $('btnShare').addEventListener('click', function () {
     track('share_clicked', { screen: 's2', card_id: state.guardian ? state.guardian.카드ID : null });
     win.alert('공유 링크가 준비되었습니다. (목업 — 실제 공유는 동작하지 않습니다)');
+  });
+
+  // S3 — "오늘 채울 기운" 부적 CTA (재구매 엔진 계측)
+  $('btnNeedCta').addEventListener('click', function () {
+    track('need_cta_clicked', {
+      element: state.need ? state.need.오행 : null,
+      reason: state.need ? state.need.사유코드 : null,
+      grade: state.prose ? state.prose.grade : null,
+      arm: arm
+    });
+    $('prepDesc').textContent = (state.need ? state.need.오행 : '') + ' 기운의 부적 — 곧 만나실 수 있도록 준비하고 있습니다.';
+    $('notifyOk').hidden = true;
+    $('btnNotify').disabled = false;
+    show('s5');
   });
 
   // S3
