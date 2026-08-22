@@ -1067,6 +1067,7 @@
       win.setTimeout(function () { late.classList.add('shown'); }, 1080);
     }
 
+    showScrollCue('cueS2');
     if (!reached.s2) {
       reached.s2 = true;
       track('s2_reached', { ilju: g.일주_한글, ohaeng: g.오행, card_id: g.카드ID });
@@ -1195,6 +1196,7 @@
       }, 40);
     }
 
+    showScrollCue('cueS3');
     if (!reached.s3) {
       reached.s3 = true;
       track('s3_reached', {
@@ -1464,6 +1466,7 @@
             profiles.remove(p.id);
             track('profile_removed', {});
             renderProfileList();
+            renderWelcome();
           }
         });
 
@@ -1791,6 +1794,7 @@
 
     show('sa');
 
+    showScrollCue('cueSa');
     if (!reached.sa) {
       reached.sa = true;
       track('sa_reached', {
@@ -2114,6 +2118,7 @@
     highlightSingleDae(shop, purpose);
 
     show('sh');
+    maybeShowAreaHint();   // v7: 첫 홈 1회만 탭 힌트
     // 홈에 들어오면 다른 화면의 홈 버튼을 노출한다
     var hb = ['s2Home', 'saHome', 's3Home', 's4Home'];
     for (var h = 0; h < hb.length; h++) $(hb[h]).hidden = false;
@@ -2310,6 +2315,110 @@
       sc.textContent = String(score) + '점';
       host.appendChild(sc);
     }
+  }
+
+
+  /* =========================================================
+   * 15. v7 — S0 환영 모드 (스펙 1장) · 탭 어포던스 (스펙 2장)
+   *
+   * ★ 신규(등록 0명) 동선·문구는 한 글자도 바꾸지 않는다.
+   *   환영 모드는 등록 1명 이상일 때만 켜지고, CTA는 기존 selectProfile()을
+   *   그대로 호출한다(새 경로 금지 — 완주 정의·선형 보존).
+   * ======================================================= */
+
+  var LS_HINT = 'gs_area_hint_shown';   // 세부 운세 힌트 1회성 표식
+
+  /* 인사 1줄 — 시간대별 3변형. 결정론(시각으로만 갈림), 확언·과장 금지. */
+  function greetingFor(name, hour) {
+    var h = (typeof hour === 'number') ? hour : new Date().getHours();
+    var slot = (h >= 5 && h < 12) ? '아침' : (h >= 12 && h < 18) ? '낮' : '밤';
+    var line;
+    if (slot === '아침') line = '님, 오늘의 기운이 준비되어 있어요';
+    else if (slot === '낮') line = '님, 오늘 흐름을 살펴보실 시간이에요';
+    else line = '님, 오늘 하루의 기운을 확인해 보세요';
+    return { slot: slot, text: name + line };
+  }
+
+  /** 대표 사용자 — 최근 활성 프로필, 없으면 첫 프로필 */
+  function headlineProfile() {
+    if (!profiles) return null;
+    var active = profiles.getActive();
+    if (active) return active;
+    var list = profiles.list();
+    return list.length ? list[0] : null;
+  }
+
+  /** 환영 모드 렌더. 등록 0명이면 아무것도 하지 않고 기존 화면을 그대로 둔다. */
+  function renderWelcome() {
+    if (!profiles) return false;
+    var head = headlineProfile();
+    if (!head) {
+      // 첫 방문 — 현행 유지(문구·동선 무변경). 여기선 '새 사용자 추가'가 주 CTA다.
+      $('welcomeBox').hidden = true;
+      $('s0Empty').hidden = false;
+      $('profileList').hidden = false;
+      $('btnAddProfile').className = 'btn btn-main';
+      return false;
+    }
+
+    var iso = solarISOof(head);
+    var g = read(iso);
+    var t = read(today);
+
+    $('welcomeImg').src = CARD_FILE[g.오행];
+    $('welcomeImg').alt = g.오행 + ' 기운의 수호신 카드';
+
+    var greet = greetingFor(head.name);
+    $('welcomeGreet').textContent = greet.text;
+    $('welcomeName').textContent = OHAENG_ATTR[g.오행].수식 + ' ' + g.띠;
+
+    /* 오늘 티저 — 간지 + 인장만. 점수 수치·풀이 문장은 넣지 않는다
+     * (눌러 들어갈 이유를 메인에서 소진하지 않기 위함 — 스펙 1장 3번).
+     * 가호 요소도 넣지 않는다(A/B 축 오염 금지). */
+    var SJw = getSaju();
+    var seal = '';
+    if (SJw && state && g.일간) {
+      var dgw = diagnose(g, t);
+      seal = SJw.GRADE_SEAL[SJw.scoreGrade(dgw.score)];
+    }
+    var md = today.split('-');
+    $('welcomeTeaser').textContent = (+md[1]) + '월 ' + (+md[2]) + '일 ' + t.일주_한글 + '일';
+    $('welcomeSeal').textContent = seal || '·';
+
+    $('welcomeBox').hidden = false;
+    $('s0Empty').hidden = true;
+    $('profileList').hidden = true;          // 목록은 "다른 사람 보기"로 펼친다
+    /* 시각 위계(스펙 §1-5 "하단에 작게"): 환영 모드의 주 CTA는 '오늘의 운세 보기' 하나뿐이다.
+     * '새 사용자 추가'는 '다른 사람 보기'와 같은 급의 부 CTA로 낮춘다.
+     * 0명 화면에서는 이 버튼이 주 CTA이므로 대형 금색을 그대로 둔다. */
+    $('btnAddProfile').className = 'btn btn-sub';
+    $('btnWelcomeSwitch').setAttribute('aria-expanded', 'false');
+
+    if (!reached.welcome) {
+      reached.welcome = true;
+      track('welcome_shown', { slot: greet.slot, profiles: profiles.count() });
+    }
+    return true;
+  }
+
+  /** 진행 버튼이 폴드 밖일 때 인지가 안 되는 문제 — 각 화면 첫 진입 시 1회만 유도 신호.
+   * 세션 단위(reached)라 같은 화면을 다시 봐도 반복 노출되지 않는다. */
+  var cueShown = {};
+  function showScrollCue(cueId) {
+    var el = $(cueId);
+    if (!el) return;
+    if (cueShown[cueId]) { el.hidden = true; return; }
+    cueShown[cueId] = true;
+    el.hidden = false;
+  }
+
+  /** 첫 홈 랜딩 1회만 힌트를 보여준다(잔소리 방지 — 스펙 2장). */
+  function maybeShowAreaHint() {
+    var el = $('areaHint');
+    if (!el) return;
+    if (store.get(LS_HINT) === '1') { el.hidden = true; return; }
+    el.hidden = false;
+    store.set(LS_HINT, '1');
   }
 
   /* =========================================================
@@ -2548,6 +2657,8 @@
         has_hour: !!cand.hourBranch, has_gender: !!cand.gender
       });                                   // C-⑤ 생년월일 원문 미전송
       renderProfileList();
+      /* 저장 직후에는 곧바로 selectProfile()로 넘어가므로 환영 화면을 그리지 않는다.
+       * 그리면 신규 첫 완주 도중 welcome_shown이 발생해 계측이 오염된다(2026-08-23 적발). */
       selectProfile(res.profile.id);
     });
 
@@ -2620,8 +2731,28 @@
       renderHome();
     });
 
+    /* ---- v7 환영 모드 배선 ---- */
+    $('btnWelcomeCta').addEventListener('click', function () {
+      var head = headlineProfile();
+      if (!head) return;
+      track('welcome_cta_clicked', {});
+      /* ★ 기존 프로필 선택과 **완전히 같은** 분기 함수를 탄다.
+       * 완주자=홈 랜딩 / 미완주자=선형 이어서 — 분기 로직 무변경. */
+      selectProfile(head.id);
+    });
+
+    $('btnWelcomeSwitch').addEventListener('click', function () {
+      var list = $('profileList');
+      var open = list.hidden;
+      list.hidden = !open;
+      this.setAttribute('aria-expanded', open ? 'true' : 'false');
+      this.textContent = open ? '목록 접기' : '다른 사람 보기';
+      if (open) track('welcome_switch_opened', { profiles: profiles.count() });
+    });
+
     // 첫 화면 결정: 프로필이 있으면 목록, 없으면 입력 폼으로 바로
     renderProfileList();
+    renderWelcome();
   }
 
   /* ---- 기동 시 self-test ---- */

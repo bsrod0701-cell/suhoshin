@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap">
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 
@@ -21,7 +21,27 @@
   <section class="screen is-active" id="s0">
     <div class="wrap">
       <p class="brand">내 수호신</p>
-      <h1 class="head">누구의 사주를<br>볼까요?</h1>
+
+      <!-- 등록 0명(첫 방문): 현행 그대로. 문구·동선 무변경(신규 선형 보존) -->
+      <div id="s0Empty">
+        <h1 class="head">누구의 사주를<br>볼까요?</h1>
+      </div>
+
+      <!-- v7 환영 모드: 등록 1명 이상일 때만. "명부가 아니라 현관" -->
+      <div id="welcomeBox" hidden>
+        <div class="welcome-card">
+          <div class="welcome-art"><img id="welcomeImg" alt="" decoding="async"></div>
+          <p class="welcome-greet" id="welcomeGreet">—</p>
+          <p class="welcome-name" id="welcomeName">—</p>
+          <p class="welcome-teaser">
+            <span id="welcomeTeaser">—</span>
+            <span class="welcome-seal" id="welcomeSeal" aria-hidden="true">吉</span>
+          </p>
+        </div>
+        <button class="btn btn-main btn-lg" id="btnWelcomeCta">오늘의 운세 보기</button>
+        <button class="welcome-switch" id="btnWelcomeSwitch" type="button"
+                aria-expanded="false" aria-controls="profileList">다른 사람 보기</button>
+      </div>
 
       <div class="profile-list" id="profileList"></div>
 
@@ -94,6 +114,7 @@
           <span class="home-line" id="homeLine">—</span>
         </span>
         <span class="home-seal" id="homeSeal" aria-hidden="true">吉</span>
+        <span class="chev" aria-hidden="true">›</span>
       </button>
 
       <!-- 2. 내 수호신 미니 카드 -->
@@ -103,11 +124,13 @@
           <span class="home-guard-eyebrow">내 수호신</span>
           <span class="home-guard-name" id="homeGuardName">—</span>
           <span class="home-guard-sub" id="homeGuardSub">—</span>
+          <span class="home-guard-more">카드 보기 ›</span>
         </span>
       </button>
 
       <!-- 3. 세부 운세 4카드 -->
       <h3 class="sec-title">오늘의 세부 운세</h3>
+      <p class="tap-hint" id="areaHint" hidden>카드를 누르면 자세한 풀이가 열려요</p>
       <div class="area-grid" id="areaGrid"></div>
 
       <!-- 4. 이번 주 흐름 -->
@@ -125,7 +148,7 @@
           <p class="need-eyebrow">오늘의 부적</p>
           <p class="need-el" id="homeNeedEl">—</p>
           <p class="need-why" id="homeNeedWhy">—</p>
-          <button class="btn btn-cta sm" id="homeNeedCta">이 부적 보기</button>
+          <button class="btn btn-cta sm" id="homeNeedCta">이 부적 보기 ›</button>
         </div>
       </div>
 
@@ -232,6 +255,7 @@
           <button class="btn btn-ghost" id="btnSave">저장하기</button>
           <button class="btn btn-ghost" id="btnShare">공유하기</button>
         </div>
+        <p class="scroll-cue" id="cueS2" hidden>아래로 넘겨 계속 보기</p>
         <button class="btn btn-main" id="toSa">내 사주 보기</button>
       </div>
     </div>
@@ -281,7 +305,8 @@
         <p class="rx-target">오늘의 흐름을 보고, 마음에 드는 <span>부적</span>은 소장하실 수 있습니다.</p>
       </div>
 
-      <button class="btn btn-main" id="toS3FromSa">오늘의 흐름 보기</button>
+      <p class="scroll-cue" id="cueSa" hidden>아래로 넘겨 계속 보기</p>
+        <button class="btn btn-main" id="toS3FromSa">오늘의 흐름 보기</button>
       <button class="btn btn-ghost" id="backToS2FromSa">내 수호신 다시 보기</button>
       <p class="tiny center">재미와 마음의 위안을 위한 콘텐츠입니다.</p>
     </div>
@@ -328,7 +353,8 @@
         </div>
       </div>
 
-      <button class="btn btn-main" id="toS4">오늘의 부적 보기</button>
+      <p class="scroll-cue" id="cueS3" hidden>아래로 넘겨 계속 보기</p>
+        <button class="btn btn-main" id="toS4">오늘의 부적 보기</button>
       <button class="btn btn-ghost" id="backToS2">내 수호신 다시 보기</button>
 
       <p class="tiny center">재미와 마음의 위안을 위한 콘텐츠입니다.</p>
@@ -442,9 +468,9 @@
   </div>
 </div>
 
-<script src="vendor/manseryeok.js?v=6"></script>
-<script src="saju.js?v=6"></script>
-<script src="profile.js?v=6"></script>
-<script src="app.js?v=6"></script>
+<script src="vendor/manseryeok.js?v=7"></script>
+<script src="saju.js?v=7"></script>
+<script src="profile.js?v=7"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>

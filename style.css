@@ -958,3 +958,106 @@ form{display:flex;flex-direction:column;gap:8px}
   font-family:var(--font-display);font-size:19px;font-weight:700;
   color:var(--gold);font-variant-numeric:tabular-nums;
 }
+
+/* =========================================================
+ * v7 — S0 환영 모드 · 탭 어포던스 (v4 토큰만)
+ * ======================================================= */
+
+#welcomeBox[hidden],#s0Empty[hidden],.profile-list[hidden],.tap-hint[hidden]{display:none}
+
+.welcome-card{
+  display:flex;flex-direction:column;align-items:center;gap:8px;
+  background:linear-gradient(180deg,#221B12,#191309);
+  border:1px solid var(--line-strong);
+  border-radius:16px;padding:20px 18px 18px;
+}
+.welcome-art{width:min(42vw,132px)}
+.welcome-art img{
+  width:100%;aspect-ratio:675/1200;object-fit:cover;
+  border-radius:9px;display:block;
+  box-shadow:0 0 26px rgba(201,162,39,.20),0 8px 22px rgba(0,0,0,.5);
+}
+.welcome-greet{
+  margin:6px 0 0;text-align:center;font-size:15px;line-height:1.6;color:var(--hanji);
+}
+.welcome-name{
+  margin:0;text-align:center;font-family:var(--font-display);
+  font-size:19px;font-weight:700;color:var(--gold);
+}
+.welcome-teaser{
+  margin:2px 0 0;display:flex;align-items:center;gap:7px;
+  font-size:12.5px;color:var(--hanji-dim);
+}
+.welcome-seal{
+  width:20px;height:20px;display:inline-flex;align-items:center;justify-content:center;
+  background:var(--jusa);color:#FFF6EA;border-radius:3px;
+  box-shadow:inset 0 0 0 1.2px rgba(255,246,234,.85);
+  font-family:var(--font-display);font-size:11px;font-weight:700;line-height:1;
+  transform:rotate(-5deg);
+}
+/* 대형 CTA — 들어가는 문이 가장 크게 보이도록 */
+.btn-lg{font-size:17px;min-height:58px;margin-top:2px}
+.welcome-switch{
+  font:inherit;font-size:13px;font-weight:600;cursor:pointer;
+  background:transparent;color:var(--hanji-dim);
+  border:0;padding:0 12px;min-height:var(--tap);width:100%;
+}
+.welcome-switch:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:8px}
+
+/* ---------- 탭 어포던스 ---------- */
+.chev{
+  margin-left:auto;flex:none;
+  color:var(--gold);font-size:17px;line-height:1;opacity:.75;
+}
+.home-guard-more{
+  margin-top:3px;font-size:11.5px;font-weight:700;color:var(--gold);
+}
+/* 눌림 피드백 — 미세하게만 */
+.home-score:active,.home-guard:active,.area-card:active,.shop-item:active{
+  transform:scale(.988);
+  background-color:rgba(201,162,39,.06);
+}
+.home-score,.home-guard,.area-card{transition:transform .06s ease,background-color .15s ease}
+
+/* 1회 힌트 캡션 — 대비 4.5:1 이상(hanji-dim 6.65:1) */
+.tap-hint{
+  margin:0 0 6px;font-size:12.5px;color:var(--hanji-dim);
+  display:flex;align-items:center;gap:6px;
+}
+.tap-hint::before{content:"›";color:var(--gold);font-size:14px}
+
+/* 폴드 밖 진행 버튼 인지 — 하단 페이드 + chevron 1회 바운스 */
+.scroll-cue{
+  margin:2px 0 0;text-align:center;font-size:12.5px;color:var(--hanji-dim);
+}
+.scroll-cue[hidden]{display:none}
+.scroll-cue::after{
+  content:"⌄";display:block;color:var(--gold);font-size:16px;line-height:1;
+  animation:cueBounce 1.4s ease-in-out 2;
+}
+@keyframes cueBounce{
+  0%,100%{transform:translateY(0)}
+  50%{transform:translateY(3px)}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .home-score:active,.home-guard:active,.area-card:active,.shop-item:active{transform:none}
+  .scroll-cue::after{animation:none}
+}
+
+/* v7.1 — 환영 모드 부 CTA (시각 위계: 주 CTA는 '오늘의 운세 보기' 하나뿐)
+ * '다른 사람 보기'와 같은 급의 텍스트 버튼. 0명 화면에서는 .btn-main을 그대로 쓴다.
+ * 시각 크기는 낮추되 터치 타깃은 44px을 유지한다(::before 히트영역). */
+.btn-sub{
+  position:relative;
+  font:inherit;font-size:13px;font-weight:600;cursor:pointer;
+  background:transparent;color:var(--hanji-dim);
+  border:0;padding:0 12px;
+  width:100%;min-height:var(--tap);
+}
+.btn-sub:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:8px}
+.btn-sub::before{
+  content:"";position:absolute;left:0;right:0;
+  top:50%;transform:translateY(-50%);
+  height:var(--tap);min-height:var(--tap);
+}
