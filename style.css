@@ -847,6 +847,10 @@ form{display:flex;flex-direction:column;gap:8px}
 /* 6. 부적 진열대 */
 .shop-row{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
 .shop-item{
+  /* position:relative는 .tier-mark(절대배치)의 기준점이다.
+   * 없으면 문양이 뷰포트 우상단으로 새어 정체불명 한자가 떠 보인다(2026-08-23 실측 적발).
+   * 같은 뱃지를 쓰는 .shelf-item도 동일하게 기준점을 갖는다. */
+  position:relative;
   display:flex;flex-direction:column;gap:4px;align-items:center;
   font:inherit;cursor:pointer;padding:6px 3px;
   background:transparent;border:1px solid transparent;border-radius:9px;
