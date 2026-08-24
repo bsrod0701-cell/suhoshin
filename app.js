@@ -715,23 +715,26 @@
    * 5. 과금 실험 분기 (A/B/C)
    * ======================================================= */
 
+  /* L8-A ② 판매 문구 — 실체 있는 차별점만 적는다(치명 R2 해소).
+   * 구 문구는 해상도 차이를 내세웠으나 무료판과 같은 크기라 실체가 없었다(금지어 테스트 대상).
+   * 실제 차이는 ⓐ워터마크 없음 ⓑ이름 각인 ⓒ오늘의 가호 문구 각인 셋뿐이다. */
   var OFFERS = {
     A: {
       arm: 'A',
-      title: '오늘의 부적 소장판 3,900원',
-      desc: '워터마크 없는 고해상 원본으로 오늘의 부적을 소장하세요. 잠금화면에 딱 맞는 크기로 드립니다.',
-      cta: '소장판 받기 · 3,900원'
+      title: '오늘의 부적 각인판 3,900원',
+      desc: '워터마크 없이, 내 이름과 오늘의 가호 문구를 새겨 드립니다. 미리보기로 먼저 확인해 보세요.',
+      cta: '각인판 받기 · 3,900원'
     },
     B: {
       arm: 'B',
       title: '매일 부적 패스 · 월 6,900원',
-      desc: '매달 원하는 부적 5장을 골라 고해상으로 저장하고, 받은 부적은 언제든 다시 내려받을 수 있습니다.',
+      desc: '매달 원하는 부적 5장을 워터마크 없이 저장하고, 받은 부적은 언제든 다시 내려받을 수 있습니다.',
       cta: '패스 시작하기 · 월 6,900원'
     },
     C: {
       arm: 'C',
       title: '매일 부적 패스 · 월 9,900원',
-      desc: '매달 원하는 부적 5장을 고해상으로 저장하고, 지금까지 받은 부적 전체를 무제한으로 다시 내려받습니다.',
+      desc: '매달 원하는 부적 5장을 워터마크 없이 저장하고, 지금까지 받은 부적 전체를 무제한으로 다시 내려받습니다.',
       cta: '패스 시작하기 · 월 9,900원'
     }
   };
@@ -745,7 +748,17 @@
   var CONFIG = {
     ENDPOINT: '',        // 예: 'https://<수집서버>/collect' — 비면 전송 안 함
     SEND_BATCH: 10,      // 이벤트가 이만큼 쌓이면 전송 시도
-    COHORT_WINDOW: 7     // 재방문 관찰 창 D1~D7
+    COHORT_WINDOW: 7,    // 재방문 관찰 창 D1~D7
+
+    /* L8-A ③ 결제 토글 (스펙 2장).
+     * off(기본) = 현행 무결제 CTA 그대로, 결제 코드 미노출.
+     * on        = 위젯 결제 흐름. 전환은 이 한 줄 + 재배포.
+     * 게시 1주차는 off로 둔다(대표님 결착: 1주 무결제 → 2차 결제 on). */
+    PAYMENT_ENABLED: false,
+    /* 결제 on 시 가격 3-arm 분기를 중단하고 3,900 단일로 고정한다(R6 — 실결제 표본 분산 방지) */
+    PAID_AMOUNT: 3900,
+    PAID_PRODUCT_ID: 'engraved_v1',
+    ORDER_API: ''        // Workers 승인 서버 주소. 비면 결제 진입 불가(fail-closed)
   };
 
   var LS = {
@@ -1000,7 +1013,7 @@
   var $ = function (id) { return doc.getElementById(id); };
   var state = { ilju: null, guardian: null, talisman: null, diag: null, ctaShown: false,
     profile: null, pillars: null, strength: null, need: null, prose: null,
-    week: null, areaOpen: null };
+    week: null, areaOpen: null, order: null, paid: null };
   var reached = {};
 
   function show(screenId) {
@@ -1272,6 +1285,183 @@
     if (!showBlessing || !talId || blessingSeen[talId]) return;
     blessingSeen[talId] = true;
     track('blessing_preview_viewed', { talisman_id: talId, tier: tier });
+  }
+
+  /* =========================================================
+   * L8-A ⑤ 결제 흐름 (PAYMENT_ENABLED=on 일 때만 동작)
+   *
+   * 순서: 이름 입력·동의 → 서버 /orders → 위젯 → successUrl 복귀
+   *       → /confirm → 서명 영수증 검증 → 각인판 생성 → 소장 완료(복원 링크)
+   *
+   * ★ off면 이 경로가 아예 열리지 않는다(기존 무결제 CTA 그대로).
+   * ★ purchase_completed는 서버가 /confirm에서 기록한다 — 여기서 보고하지 않는다.
+   * ★ 이름은 canvas 합성에만 쓰고 서버로 보내지 않는다.
+   * ======================================================= */
+
+  function paymentOn() {
+    return CONFIG.PAYMENT_ENABLED === true && !!CONFIG.ORDER_API;
+  }
+
+  /** 오늘의 가호 문구 — 각인판에 새길 한 줄(노출군/미노출군 무관하게 각인엔 사용) */
+  function engraveBlessing() {
+    var SJp = getSaju();
+    if (!SJp || !state.guardian) return '';
+    var t = read(today);
+    var el = state.need ? state.need.오행 : t.오행;
+    var talId = EL_TAL_ID[el];
+    var b = SJp.blessingTier(talId, state.guardian, t);
+    return b ? (b.tier + ' · ' + b.label) : '';
+  }
+
+  function renderPayScreen() {
+    if (!paymentOn()) return false;
+    $('payName').value = '';
+    $('payConsent').checked = false;
+    $('payErr').hidden = true;
+    $('payBlessing').textContent = engraveBlessing() || '오늘의 가호';
+    $('payAmount').textContent = CONFIG.PAID_AMOUNT.toLocaleString('ko-KR') + '원';
+    show('sp');
+    track('pay_screen_viewed', { amount: CONFIG.PAID_AMOUNT });
+    return true;
+  }
+
+  /** 서버에서 주문을 발급받는다. 금액·주문번호는 서버가 정한다(클라이언트 값 신뢰 금지). */
+  function createOrder(cb) {
+    win.fetch(CONFIG.ORDER_API + '/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ productId: CONFIG.PAID_PRODUCT_ID })
+    }).then(function (r) { return r.json(); })
+      .then(function (j) { cb(j && j.orderId ? j : null); })
+      .catch(function () { cb(null); });
+  }
+
+  /** 승인 요청 — 성공 시 서명 영수증과 복원키를 받는다. */
+  function confirmOrder(payload, cb) {
+    win.fetch(CONFIG.ORDER_API + '/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function (r) {
+      return r.json().then(function (j) { return { ok: r.ok, json: j }; });
+    }).then(function (res) { cb(res); })
+      .catch(function () { cb({ ok: false, json: null }); });
+  }
+
+  /** 영수증 검증 — 서명이 있고 주문·금액이 맞아야 각인판 생성을 허용한다.
+   * 한계 수용(레드팀 R3): 클라이언트 생성 구조라 개발자도구 우회를 완전히 막을 수는 없다.
+   * 캐주얼 위조 차단까지만 하고 그 이상 방어 코드는 넣지 않는다. */
+  function receiptValid(receipt, orderId) {
+    if (!receipt || !receipt.payload || !receipt.signature) return false;
+    var p = receipt.payload;
+    return p.orderId === orderId
+      && Number(p.amount) === Number(CONFIG.PAID_AMOUNT)
+      && p.productId === CONFIG.PAID_PRODUCT_ID
+      && !!p.paidAt;
+  }
+
+  function showPaidScreen(receipt, restoreKey, name) {
+    state.paid = { receipt: receipt, restoreKey: restoreKey, name: name };
+    var g = state.guardian;
+    if (g) {
+      $('paidImg').src = CARD_FILE[state.need ? state.need.오행 : g.오행];
+      $('paidImg').alt = '각인판 미리보기';
+    }
+    var link = CONFIG.ORDER_API + '/restore?key=' + encodeURIComponent(restoreKey);
+    $('restoreLink').textContent = link;
+    $('scToast').hidden = true;
+    show('sc');
+    /* purchase_completed는 서버가 기록한다 — 여기서는 화면 도달만 남긴다 */
+    track('purchase_screen_viewed', {});
+  }
+
+  function startPayment() {
+    if (!paymentOn()) return;
+    var name = String($('payName').value || '').trim();
+    var agreed = !!$('payConsent').checked;
+    if (!name) { showPayErr('각인할 이름을 입력해 주세요.'); return; }
+    if (name.length > 12) { showPayErr('이름은 12자 이내로 입력해 주세요.'); return; }
+    if (!agreed) { showPayErr('청약철회 제한 안내에 동의해 주세요.'); return; }
+    $('payErr').hidden = true;
+
+    track('pay_start_clicked', {});
+    createOrder(function (order) {
+      if (!order) { showPayErr('주문을 만들지 못했어요. 잠시 후 다시 시도해 주세요.'); return; }
+      state.order = order;
+
+      /* 결제 위젯 — 실제 SDK는 배포 시 주입한다.
+       * 여기서는 위젯 호출부만 두고, 테스트에서는 주입된 스텁이 successUrl 복귀를 흉내낸다. */
+      var widget = win.TossPaymentsWidget || null;
+      if (!widget) {
+        showPayErr('결제 모듈을 불러오지 못했어요.');
+        track('pay_widget_missing', {});
+        return;
+      }
+      widget.requestPayment({
+        orderId: order.orderId,
+        amount: order.amount,
+        orderName: '오늘의 부적 각인판'
+      }, function (result) {
+        if (!result || !result.paymentKey) {
+          track('pay_cancelled', {});
+          return;   // 사용자가 취소 — 조용히 돌아간다
+        }
+        finishPayment(order, result.paymentKey, name);
+      });
+    });
+  }
+
+  function finishPayment(order, paymentKey, name) {
+    confirmOrder({
+      orderId: order.orderId,
+      paymentKey: paymentKey,
+      amount: order.amount,
+      consentText: $('consentText').textContent,   // 동의 문구 원문 서버 보존(이름 미포함)
+      anonId: anonId,
+      variant: blessingVariant
+    }, function (res) {
+      if (!res.ok || !res.json || res.json.status !== 'PAID') {
+        showPayErr('결제 확인에 실패했어요. 결제되었다면 곧 자동으로 처리됩니다.');
+        track('pay_confirm_failed', { code: res.json && res.json.error });
+        return;
+      }
+      if (!receiptValid(res.json.receipt, order.orderId)) {
+        showPayErr('영수증 검증에 실패했어요.');
+        track('pay_receipt_invalid', {});
+        return;
+      }
+      showPaidScreen(res.json.receipt, res.json.restoreKey, name);
+    });
+  }
+
+  function showPayErr(msg) {
+    var el = $('payErr');
+    el.textContent = msg;
+    el.hidden = false;
+  }
+
+  /** 각인판 저장 — 워터마크 없음 + 이름·가호 각인 */
+  function downloadEngraved() {
+    if (!state.paid) return;
+    composeCard(function (blob) {
+      try {
+        triggerDownload(blob || (state.guardian ? CARD_FILE[state.guardian.오행] : null));
+        showScToast('각인판을 저장했어요');
+        track('paid_download', { mode: blob ? 'composed' : 'original' });
+      } catch (e) {
+        showScToast('저장하지 못했어요. 잠시 후 다시 시도해 주세요');
+      }
+    }, { paid: true, name: state.paid.name, blessing: engraveBlessing() });
+  }
+
+  var scToastTimer = null;
+  function showScToast(msg) {
+    var el = $('scToast');
+    if (!el) return;
+    el.textContent = msg;
+    el.hidden = false;
+    if (scToastTimer) win.clearTimeout(scToastTimer);
+    scToastTimer = win.setTimeout(function () { el.hidden = true; }, 2600);
   }
 
   /* ---- S4 렌더: 오늘의 부적 + 목적 부적 ---- */
@@ -2504,7 +2694,13 @@
   }
 
   /** 수호신 카드를 canvas로 합성한다. 성공 시 blob을 콜백으로 넘긴다. */
-  function composeCard(cb) {
+  /* L8-A ① 무료 저장 = 시용상품(워터마크판).
+   * 전상법 시행령의 "시험 사용 상품 제공" 요건을 이 무료판이 담당한다(R1 해소).
+   * opts.paid === true 이면 워터마크를 넣지 않고 이름·가호 문구를 각인한다(유료 각인판). */
+  var WATERMARK_TEXT = '내 수호신 · suhoshin';
+
+  function composeCard(cb, opts) {
+    opts = opts || {};
     var g = state.guardian;
     if (!g || !doc.createElement) { cb(null); return; }
     var cap = cardCaption();
@@ -2538,6 +2734,26 @@
         cx.fillStyle = '#C9A227';
         cx.font = '400 ' + Math.round(W * 0.048) + 'px sans-serif';
         cx.fillText(cap.sub, W / 2, H - Math.round(band * 0.22));
+
+        if (opts.paid) {
+          /* 유료 각인판 — 워터마크 없음 + 이름 각인 + 오늘의 가호 문구 각인.
+           * 이름은 canvas 합성에만 쓰고 서버로 보내지 않는다(개인정보 미전송). */
+          if (opts.name) {
+            cx.fillStyle = '#F0E7D3';
+            cx.font = '700 ' + Math.round(W * 0.052) + 'px "Gowun Batang", serif';
+            cx.fillText(opts.name, W / 2, Math.round(H * 0.085));
+          }
+          if (opts.blessing) {
+            cx.fillStyle = 'rgba(240,231,211,0.92)';
+            cx.font = '400 ' + Math.round(W * 0.040) + 'px sans-serif';
+            cx.fillText(opts.blessing, W / 2, Math.round(H * 0.135));
+          }
+        } else {
+          /* 무료 미리보기 — 은은한 워터마크(공유 시 유입 경로 겸용) */
+          cx.fillStyle = 'rgba(240,231,211,0.55)';
+          cx.font = '400 ' + Math.round(W * 0.038) + 'px sans-serif';
+          cx.fillText(WATERMARK_TEXT, W / 2, H - Math.round(band * 0.06));
+        }
 
         if (cv.toBlob) {
           cv.toBlob(function (blob) { cb(blob); }, 'image/png');
@@ -2665,6 +2881,8 @@
   // S4
   $('btnCta').addEventListener('click', function () {
     track('cta_clicked', { arm: arm, offer: offer.title });
+    /* on이면 결제 화면으로. off면 아래 기존 무결제 경로를 그대로 탄다(동등성 보존). */
+    if (paymentOn() && renderPayScreen()) return;
     $('prepDesc').textContent = offer.title + ' — 곧 만나실 수 있도록 준비하고 있습니다.';
     $('notifyOk').hidden = true;
     $('btnNotify').disabled = false;
@@ -2904,6 +3122,27 @@
       this.setAttribute('aria-expanded', open ? 'true' : 'false');
       this.textContent = open ? '목록 접기' : '다른 사람 보기';
       if (open) track('welcome_switch_opened', { profiles: profiles.count() });
+    });
+
+    /* ---- L8-A 결제 화면 배선 (off면 이 화면에 도달하지 않는다) ---- */
+    $('btnPayStart').addEventListener('click', startPayment);
+    $('btnPayCancel').addEventListener('click', function () {
+      track('pay_cancelled_screen', {});
+      renderS4();
+    });
+    $('spHome').addEventListener('click', function () { renderHome(); });
+    $('btnPaidDownload').addEventListener('click', downloadEngraved);
+    $('btnScHome').addEventListener('click', function () { renderHome(); });
+    $('btnCopyRestore').addEventListener('click', function () {
+      var link = $('restoreLink').textContent;
+      if (win.navigator && win.navigator.clipboard && win.navigator.clipboard.writeText) {
+        win.navigator.clipboard.writeText(link).then(function () {
+          showScToast('복원 링크를 복사했어요');
+          track('restore_link_copied', {});
+        }, function () { showScToast('복사를 지원하지 않는 환경이에요'); });
+      } else {
+        showScToast('복사를 지원하지 않는 환경이에요');
+      }
     });
 
     // 첫 화면 결정: 프로필이 있으면 목록, 없으면 입력 폼으로 바로
