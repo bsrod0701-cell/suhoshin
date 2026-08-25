@@ -758,7 +758,13 @@
     /* 결제 on 시 가격 3-arm 분기를 중단하고 3,900 단일로 고정한다(R6 — 실결제 표본 분산 방지) */
     PAID_AMOUNT: 3900,
     PAID_PRODUCT_ID: 'engraved_v1',
-    ORDER_API: ''        // Workers 승인 서버 주소. 비면 결제 진입 불가(fail-closed)
+    ORDER_API: '',       // Workers 승인 서버 주소. 비면 결제 진입 불가(fail-closed)
+
+    /* L8-B ③ 사이트 주소 단일 상수.
+     * 공유 링크·워터마크·CORS가 모두 이 값을 참조한다.
+     * Cloudflare Pages 등으로 이전할 때 이 한 줄만 바꾸면 된다. */
+    SITE_URL: 'https://suhoshin.pages.dev/',
+    SITE_LABEL: 'suhoshin'   // 워터마크에 쓰는 짧은 표기
   };
 
   var LS = {
@@ -2669,7 +2675,7 @@
    *  · 파일명은 ASCII 고정, 생년월일 등 개인정보는 파일명·공유문구에 넣지 않는다
    * ======================================================= */
 
-  var SHARE_URL = 'https://bsrod0701-cell.github.io/suhoshin/';
+  var SHARE_URL = CONFIG.SITE_URL;   // L8-B ③ 단일 상수 참조(하드코딩 금지)
   var SAVE_FILENAME = 'guardian_card.png';   // ASCII 고정(한글 파일명 인코딩 회피)
 
   var toastTimer = null;
@@ -2697,7 +2703,7 @@
   /* L8-A ① 무료 저장 = 시용상품(워터마크판).
    * 전상법 시행령의 "시험 사용 상품 제공" 요건을 이 무료판이 담당한다(R1 해소).
    * opts.paid === true 이면 워터마크를 넣지 않고 이름·가호 문구를 각인한다(유료 각인판). */
-  var WATERMARK_TEXT = '내 수호신 · suhoshin';
+  var WATERMARK_TEXT = '내 수호신 · ' + CONFIG.SITE_LABEL;   // L8-B ③ 단일 상수 참조
 
   function composeCard(cb, opts) {
     opts = opts || {};
@@ -3143,6 +3149,36 @@
       } else {
         showScToast('복사를 지원하지 않는 환경이에요');
       }
+    });
+
+    /* ---- L8-B ② 법적 문서 3종 (푸터 링크 → 정적 화면 → 돌아가기) ---- */
+    var LEGAL_DOCS = {
+      terms: { id: 'legalTerms', label: '이용약관' },
+      privacy: { id: 'legalPrivacy', label: '개인정보처리방침' },
+      refund: { id: 'legalRefund', label: '환불(청약철회) 규정' }
+    };
+    var legalReturn = null;   // 돌아갈 화면을 기억한다
+
+    function openLegal(kind) {
+      var doc0 = LEGAL_DOCS[kind];
+      if (!doc0) return;
+      /* 현재 활성 화면을 기억해 두었다가 그대로 복귀한다 */
+      var all = doc.querySelectorAll('.screen');
+      for (var i = 0; i < all.length; i++) {
+        if (all[i].classList.contains('is-active')) { legalReturn = all[i].id; break; }
+      }
+      for (var k in LEGAL_DOCS) $(LEGAL_DOCS[k].id).hidden = (k !== kind);
+      $('slEyebrow').textContent = doc0.label;
+      show('sl');
+      track('legal_viewed', { doc: kind });
+    }
+
+    $('linkTerms').addEventListener('click', function () { openLegal('terms'); });
+    $('linkPrivacy').addEventListener('click', function () { openLegal('privacy'); });
+    $('linkRefund').addEventListener('click', function () { openLegal('refund'); });
+    $('btnLegalBack').addEventListener('click', function () {
+      track('legal_back', {});
+      show(legalReturn || 's0');
     });
 
     // 첫 화면 결정: 프로필이 있으면 목록, 없으면 입력 폼으로 바로

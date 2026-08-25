@@ -1075,3 +1075,44 @@ form{display:flex;flex-direction:column;gap:8px}
   border-radius:999px;padding:8px 12px;
 }
 .toast[hidden]{display:none}
+
+/* =========================================================
+ * L8-B — 사업자 표기 푸터 · 법적 문서 (v4 토큰만)
+ * ======================================================= */
+
+.biz-footer{
+  max-width:var(--maxw);
+  margin:0 auto;
+  padding:14px 20px calc(20px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--line);
+}
+.biz-details{border:0;background:transparent;padding:0}
+.biz-summary{
+  cursor:pointer;list-style:none;
+  font-size:12px;color:var(--hanji-dim);font-weight:600;
+  min-height:var(--tap);display:flex;align-items:center;
+}
+.biz-summary::-webkit-details-marker{display:none}
+.biz-summary::after{content:"＋";margin-left:8px;font-weight:400}
+.biz-details[open] .biz-summary::after{content:"－"}
+.biz-summary:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:6px}
+.biz-line{
+  margin:6px 0 0;font-size:11.5px;line-height:1.75;color:var(--hanji-dim);
+  word-break:keep-all;
+}
+.biz-links{display:flex;flex-wrap:wrap;gap:4px 14px;margin:10px 0 0}
+.biz-link{
+  font:inherit;font-size:11.5px;font-weight:700;cursor:pointer;
+  background:transparent;color:var(--gold);border:0;padding:0;
+  min-height:var(--tap);
+  text-decoration:underline;text-underline-offset:3px;
+}
+.biz-link:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:4px}
+
+/* 법적 문서 본문 */
+.legal[hidden]{display:none}
+.legal-p{
+  margin:0 0 12px;font-size:13.5px;line-height:1.8;color:var(--hanji);
+  word-break:keep-all;
+}
+.legal-p b{color:var(--gold);font-weight:700}

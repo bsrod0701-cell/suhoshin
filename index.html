@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&display=swap">
-<link rel="stylesheet" href="style.css?v=11">
+<link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
 
@@ -465,6 +465,55 @@
     </div>
   </section>
 
+  <!-- ===== SL 법적 문서 (약관 · 개인정보처리방침 · 환불규정) =====
+       ※ 법률 자문 전 초안이다. 게시 전 전문가 검토를 거쳐야 한다.
+          이 사실은 코드 주석에만 두고 화면에는 노출하지 않는다(발주 지시). -->
+  <section class="screen" id="sl">
+    <div class="wrap">
+      <p class="eyebrow" id="slEyebrow">이용약관</p>
+
+      <!-- 이용약관 -->
+      <div class="legal" id="legalTerms" hidden>
+        <h2 class="head sm">이용약관</h2>
+        <p class="legal-p">제1조(목적) 이 약관은 주식회사 붐스토리(이하 "회사")가 제공하는 「내 수호신」 서비스(이하 "서비스")의 이용 조건과 절차를 정합니다.</p>
+        <p class="legal-p">제2조(서비스의 성격) 서비스가 제공하는 사주 풀이·오늘의 운세·부적 이미지는 <b>재미와 마음의 위안을 위한 오락 콘텐츠</b>입니다. 회사는 그 내용이 사실이거나 특정 결과를 보장한다고 표방하지 않습니다.</p>
+        <p class="legal-p">제3조(회원가입 없음) 서비스는 로그인이나 회원가입 없이 이용합니다. 이용자가 입력한 이름·생년월일은 이용자 기기에만 저장되며 회사 서버로 전송되지 않습니다.</p>
+        <p class="legal-p">제4조(유료 상품) 유료 상품인 "각인판"은 워터마크 없는 이미지에 이용자가 입력한 이름과 그날의 가호 문구를 새겨 제공하는 디지털 콘텐츠입니다. 이미지 생성은 이용자 기기에서 이루어집니다.</p>
+        <p class="legal-p">제5조(전달 및 재발급) 결제가 완료되면 다운로드가 가능하며, 결제 시 발급되는 복원 링크로 기기 변경·저장소 초기화 이후에도 다시 받을 수 있습니다. 복원 링크의 보관은 이용자 책임입니다.</p>
+        <p class="legal-p">제6조(청약철회) 청약철회와 환불에 관한 사항은 별도의 「환불(청약철회) 규정」에 따릅니다.</p>
+        <p class="legal-p">제7조(면책) 서비스의 운세·풀이 내용은 오락 목적이며, 이를 근거로 한 이용자의 판단과 그 결과에 대해 회사는 책임을 지지 않습니다. 다만 회사의 고의 또는 중대한 과실로 인한 손해는 그러하지 않습니다.</p>
+        <p class="legal-p">제8조(문의) 서비스 관련 문의는 boom@boomstory.co.kr 또는 070-8795-7524로 접수합니다.</p>
+      </div>
+
+      <!-- 개인정보처리방침 -->
+      <div class="legal" id="legalPrivacy" hidden>
+        <h2 class="head sm">개인정보처리방침</h2>
+        <p class="legal-p">주식회사 붐스토리는 「내 수호신」 서비스 이용자의 개인정보를 다음과 같이 처리합니다.</p>
+        <p class="legal-p"><b>1. 서버로 전송하지 않는 정보</b><br>이용자가 입력한 <b>이름·생년월일·태어난 시각·성별</b>은 이용자 기기의 저장소(localStorage)에만 저장되며 회사 서버로 전송되지 않습니다. 각인판의 이름 역시 이용자 기기에서 이미지에 합성되며 전송되지 않습니다. 기기에서 프로필을 삭제하면 해당 정보는 사라집니다.</p>
+        <p class="legal-p"><b>2. 수집하는 익명 이용 정보</b><br>서비스 개선을 위해 개인을 식별할 수 없는 이용 기록을 수집합니다. 수집 항목은 다음과 같습니다.<br>· 익명 식별자(기기에서 생성한 무작위 값)<br>· 화면 도달·버튼 클릭 등 이용 이벤트 이름과 시각<br>· 실험 분류값, 오늘의 점수·등급 등 화면 표시에 쓰인 결과값<br>· 접속 환경 구분(일반 브라우저 / 인앱 브라우저)<br>이 정보에는 이름·생년월일이 포함되지 않습니다.</p>
+        <p class="legal-p"><b>3. 결제 정보</b><br>유료 상품 결제 시 주문번호·금액·결제 상태·결제 승인 키·청약철회 동의 문구와 동의 시각을 보관합니다. 카드번호 등 결제수단 정보는 회사가 보관하지 않으며 결제대행사가 처리합니다.</p>
+        <p class="legal-p"><b>4. 처리 위탁 및 보관 위치</b><br>익명 이용 정보와 주문 정보는 Cloudflare, Inc.의 Workers·D1 서비스에 저장됩니다. 결제 처리는 결제대행사에 위탁합니다.</p>
+        <p class="legal-p"><b>5. 보유 기간</b><br>주문·결제 기록은 관계 법령에서 정한 기간(전자상거래법상 대금 결제 및 재화 공급에 관한 기록 5년) 동안 보관한 뒤 파기합니다. 익명 이용 정보는 서비스 개선 목적 달성 시 파기합니다.</p>
+        <p class="legal-p"><b>6. 이용자의 권리</b><br>기기에 저장된 정보는 이용자가 프로필 삭제 또는 브라우저 저장소 삭제로 직접 지울 수 있습니다. 주문 기록의 열람·삭제 요청은 아래 연락처로 접수합니다.</p>
+        <p class="legal-p"><b>7. 문의처</b><br>boom@boomstory.co.kr · 070-8795-7524</p>
+      </div>
+
+      <!-- 환불(청약철회) 규정 -->
+      <div class="legal" id="legalRefund" hidden>
+        <h2 class="head sm">환불(청약철회) 규정</h2>
+        <p class="legal-p"><b>1. 미리보기 제공</b><br>유료 각인판을 구매하기 전에 워터마크가 있는 미리보기 이미지를 무료로 저장해 내용을 확인하실 수 있습니다.</p>
+        <p class="legal-p"><b>2. 다운로드 전 청약철회</b><br>결제 후 각인판 다운로드를 시작하기 전에는 청약철회가 가능합니다.</p>
+        <p class="legal-p"><b>3. 다운로드 후 제한</b><br>디지털 콘텐츠의 특성상 각인판 다운로드가 시작되면 청약철회가 제한됩니다. 이 사실은 결제 전 화면에서 안내되고 이용자의 동의를 받습니다.</p>
+        <p class="legal-p"><b>4. 표시·광고와 다른 경우</b><br>재화의 내용이 표시·광고 내용과 다르거나 계약 내용과 다르게 이행된 경우에는, 그 재화를 공급받은 날부터 <b>3개월 이내</b>, 그 사실을 안 날 또는 알 수 있었던 날부터 <b>30일 이내</b>에 청약철회를 하실 수 있습니다.</p>
+        <p class="legal-p"><b>5. 접수 방법</b><br>boom@boomstory.co.kr 또는 070-8795-7524로 주문번호와 함께 접수해 주세요.</p>
+        <p class="legal-p"><b>6. 처리 기한</b><br>환불 접수 후 <b>3영업일 이내</b>에 결제 취소를 처리합니다. 카드사 사정에 따라 실제 반영까지 며칠이 더 걸릴 수 있습니다.</p>
+        <p class="legal-p"><b>7. 환불 후 이용 제한</b><br>환불이 완료된 주문의 복원 링크는 더 이상 사용할 수 없습니다.</p>
+      </div>
+
+      <button class="btn btn-ghost" id="btnLegalBack">돌아가기</button>
+    </div>
+  </section>
+
   <!-- ===== S5 결제 의향 (무결제) ===== -->
   <section class="screen" id="s5">
     <div class="wrap narrow">
@@ -511,6 +560,19 @@
   </div>
 </div>
 
+<!-- L8-B ① 사업자 표기 푸터 — 전 화면 공통(작은 글씨, 접힘식) -->
+<footer class="biz-footer">
+  <details class="biz-details">
+    <summary class="biz-summary">사업자 정보 · 약관</summary>
+    <p class="biz-line" id="bizInfo">상호 주식회사 붐스토리 · 대표 이홍채 · 사업자등록번호 109-86-38388 · 통신판매업신고 제2014-고양일산동-1153호 · 주소 경기도 고양시 일산동구 장진천길 66-35, 5동(설문동) · 연락처 070-8795-7524 · 문의 boom@boomstory.co.kr</p>
+    <p class="biz-links">
+      <button type="button" class="biz-link" id="linkTerms">이용약관</button>
+      <button type="button" class="biz-link" id="linkPrivacy">개인정보처리방침</button>
+      <button type="button" class="biz-link" id="linkRefund">환불규정</button>
+    </p>
+  </details>
+</footer>
+
 <!-- 개발자용 숨김 계측 패널 (5회 탭) -->
 <button id="devDot" aria-hidden="true" tabindex="-1" title=""></button>
 <div id="devPanel" hidden>
@@ -525,9 +587,9 @@
   </div>
 </div>
 
-<script src="vendor/manseryeok.js?v=11"></script>
-<script src="saju.js?v=11"></script>
-<script src="profile.js?v=11"></script>
-<script src="app.js?v=11"></script>
+<script src="vendor/manseryeok.js?v=12"></script>
+<script src="saju.js?v=12"></script>
+<script src="profile.js?v=12"></script>
+<script src="app.js?v=12"></script>
 </body>
 </html>
