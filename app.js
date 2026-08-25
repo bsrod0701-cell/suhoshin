@@ -746,7 +746,7 @@
   /* C-⑦ 전송 설정. 값이 비면 전송하지 않는다(현재 기본값 = 빈 값 고정).
    * 실배포 시 여기에만 수집 엔드포인트를 넣으면 sendEvents()가 동작한다. */
   var CONFIG = {
-    ENDPOINT: '',        // 예: 'https://<수집서버>/collect' — 비면 전송 안 함
+    ENDPOINT: 'https://suhoshin-pay.boomstory.workers.dev/events',   // L8-C 실연결
     SEND_BATCH: 10,      // 이벤트가 이만큼 쌓이면 전송 시도
     COHORT_WINDOW: 7,    // 재방문 관찰 창 D1~D7
 
@@ -953,6 +953,35 @@
 
   /* C-⑦ 전송. CONFIG.ENDPOINT가 비면 아무 것도 하지 않는다(현재 기본값).
    * 값이 들어오면 미전송분만 POST한다. 네트워크 코드는 이 함수 하나뿐이다. */
+  /* L8-C 전송 어댑터 — 서버(handleEvents) 규격으로 변환한다.
+   *
+   * 왜 필요한가:
+   *  ① 로컬 이벤트의 키는 `event`인데 서버는 `ev.name`이 문자열일 때만 저장한다.
+   *     변환 없이 보내면 HTTP 200이어도 전부 skip돼 stored=0이 된다(조용한 데이터 전멸).
+   *  ② event_id가 없으면 서버가 무작위 id를 부여한다. 전송 실패 후 재시도하면
+   *     같은 이벤트가 다른 id로 다시 저장돼 dedup이 무력화된다.
+   *
+   * ★ 로컬 저장 형식(gs_events)과 지표 정의는 건드리지 않는다 — 전송 직전 변환만 한다.
+   */
+
+  /** 재전송해도 같은 값이 나오는 결정론 이벤트 ID.
+   * 같은 이벤트(같은 anon/session/ts/전역 인덱스)는 몇 번을 보내도 동일한 id가 된다. */
+  function eventIdFor(ev, absoluteIndex) {
+    var a = String(anonId || '').replace(/-/g, '').slice(0, 8);
+    var ses = String(ev.session || sessionId || '').replace(/-/g, '').slice(0, 8);
+    var ts = String(ev.ts || '').replace(/[^0-9]/g, '');
+    return a + '_' + ses + '_' + ts + '_' + absoluteIndex;
+  }
+
+  /** 로컬 이벤트 → 서버 규격. 원본 객체는 수정하지 않는다(로컬 형식 보존). */
+  function toServerEvent(ev, absoluteIndex) {
+    var out = {};
+    for (var k in ev) if (ev.hasOwnProperty(k)) out[k] = ev[k];
+    out.name = ev.event;                       // ★ 서버가 보는 키
+    out.event_id = eventIdFor(ev, absoluteIndex);   // ★ 재전송에도 동일
+    return out;
+  }
+
   function sendEvents() {
     if (!CONFIG.ENDPOINT) return false;   // 미작동이 기본
     var sentUpto = parseInt(store.get(LS.sent) || '0', 10);
@@ -960,7 +989,13 @@
     var pending = events.slice(sentUpto);
     if (!pending.length) return false;
 
-    var payload = JSON.stringify({ anon_id: anonId, arm: arm, events: pending });
+    /* 전역 인덱스(sentUpto + i)를 쓴다 — 재시도해도 같은 이벤트는 같은 인덱스라 id가 보존된다. */
+    var wire = [];
+    for (var i = 0; i < pending.length; i++) {
+      wire.push(toServerEvent(pending[i], sentUpto + i));
+    }
+
+    var payload = JSON.stringify({ anon_id: anonId, arm: arm, events: wire });
     var upto = events.length;
 
     try {
@@ -983,6 +1018,7 @@
   win.SMOKE = {
     id: anonId, arm: arm, events: events, config: CONFIG,
     sendEvents: sendEvents, track: track,
+    toServerEvent: toServerEvent, eventIdFor: eventIdFor,   // L8-C 어댑터(테스트용 노출)
     read: read, dayPillar: dayPillar, diagnose: diagnose, selfTest: runSelfTest,
     engine: ENGINE
   };
